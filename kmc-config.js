@@ -4,8 +4,8 @@
 // ============================================================
 
 // ── CONFIGURE YOUR SUPABASE PROJECT HERE ──────────────────────
-const SUPABASE_URL  = 'https://hgpfmdgxupdesakalfyr.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhncGZtZGd4dXBkZXNha2FsZnlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MjcwOTMsImV4cCI6MjA5NjUwMzA5M30.kXdwfQUY8IGh9TBEhO-o8NO3-3LGLIpKSYgWy4O-Nlc';
+const SUPABASE_URL  = 'https://bbcaybyaldpcwxplcgvn.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiY2F5YnlhbGRwY3d4cGxjZ3ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTg4MDQsImV4cCI6MjA5NjQ3NDgwNH0.gdil7MarkiPC4hXpekChxznyKQga8cjdxME9vMTCNvY';
 // ──────────────────────────────────────────────────────────────
 
 // Load Supabase JS from CDN (v2)
