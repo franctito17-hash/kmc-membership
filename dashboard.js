@@ -1069,18 +1069,7 @@ function renderDioceseReport() {
   }).join('') : '<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--slate-light)">No dioceses yet</td></tr>';
 }
 
-function renderOffertoryReport() {
-  document.getElementById('rep-offertory-tbody').innerHTML = allChurches.length ? allChurches.map(c=>{
-    const ofs=allOffertory.filter(o=>o.church_name===c.name);
-    const offTotal=ofs.reduce((s,o)=>s+(o.total_amount||0),0);
-    const titheTotal=ofs.reduce((s,o)=>s+(o.tithe_total||0),0);
-    const grand=offTotal+titheTotal;
-    if (!ofs.length) return '';
-    return`<tr><td><strong>${c.name}</strong></td><td>${c.diocese||'—'}</td><td>${ofs.length}</td>
-      <td><strong>KES ${fmt(offTotal)}</strong></td><td><strong>KES ${fmt(titheTotal)}</strong></td>
-      <td style="font-weight:700;color:var(--forest)">KES ${fmt(grand)}</td></tr>`;
-  }).filter(Boolean).join('') || '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--slate-light)">No offertory records yet</td></tr>';
-}
+function renderOffertoryReport() { const tbody = document.getElementById('rep-offertory-tbody'); tbody.innerHTML = allChurches.length ? allChurches .map(c => { const ofs = allOffertory.filter(o => o.church_name === c.name); if (!ofs.length) return ''; const offTotal = ofs.reduce((s, o) => s + (o.total_amount || 0), 0); const titheTotal = ofs.reduce((s, o) => s + (o.tithe_total || 0), 0); const grand = offTotal + titheTotal; return ` <tr> <td><strong>${c.name}</strong></td> <td>${c.diocese || '—'}</td> <td>${ofs.length}</td> <td><strong>KES ${fmt(offTotal)}</strong></td> <td><strong>KES ${fmt(titheTotal)}</strong></td> <td style="font-weight:700;color:var(--forest)"> KES ${fmt(grand)} </td> </tr> `; }) .filter(Boolean) .join('') : ` <tr> <td colspan="6" style="text-align:center;padding:32px;color:var(--slate-light)"> No offertory records yet </td> </tr> `; }
 
 function exportPaymentsCSV() {
   const headers=['Receipt No','Member','Amount','Method','Date','Year'];
