@@ -43,8 +43,8 @@ kmc-system/
 Open `kmc-config.js` and replace these two lines:
 
 ```javascript
-const SUPABASE_URL  = 'https://YOUR_PROJECT_ID.supabase.co';
-const SUPABASE_ANON = 'YOUR_ANON_PUBLIC_KEY';
+const SUPABASE_URL  = '[https://YOUR_PROJECT_ID.supabase.co](https://supabase.com/dashboard/project/bbcaybyaldpcwxplcgvn/settings/api-keys/legacy)';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiY2F5YnlhbGRwY3d4cGxjZ3ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTg4MDQsImV4cCI6MjA5NjQ3NDgwNH0.gdil7MarkiPC4hXpekChxznyKQga8cjdxME9vMTCNvY';
 ```
 
 With your actual values:
