@@ -46,6 +46,8 @@ async function init() {
   document.getElementById('hdr-role').textContent = formatRole(profile.role);
   document.getElementById('hdr-avatar').textContent = profile.full_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 
+  applyRoleRestrictions();
+
   // Load all data
   await Promise.all([loadDioceses(), loadChurches()]);
   await Promise.all([loadMembers(), loadPayments(), loadOffertory(), loadTithes()]);
@@ -57,6 +59,65 @@ async function init() {
 function formatRole(r) {
   const map = { super_admin:'Super Admin', diocese_admin:'Diocese Admin', church_admin:'Church Admin', finance_officer:'Finance Officer', viewer:'Viewer' };
   return map[r] || r;
+}
+
+// ── ROLE-BASED ACCESS CONTROL ───────────────────────────────────
+function canEdit() {
+  return profile.role !== 'viewer';
+}
+function isSuperAdmin() {
+  return profile.role === 'super_admin';
+}
+function isDioceseAdmin() {
+  return profile.role === 'diocese_admin';
+}
+function isChurchAdmin() {
+  return profile.role === 'church_admin';
+}
+function isFinanceOfficer() {
+  return profile.role === 'finance_officer';
+}
+
+function hideNav(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+}
+
+function applyRoleRestrictions() {
+  const role = profile.role;
+
+  // ── Users & Roles: Super Admin only ──────────────────────────
+  if (role !== 'super_admin') {
+    hideNav('section-system');
+  }
+
+  // ── Church Structure (Dioceses/Churches): hide for church_admin & below ──
+  if (role === 'church_admin' || role === 'finance_officer' || role === 'viewer') {
+    hideNav('section-structure');
+  } else if (role === 'diocese_admin') {
+    // Diocese admin can see churches in their diocese but not the Dioceses list
+    hideNav('nav-dioceses');
+  }
+
+  // ── Register Member / Bulk Upload: not for finance_officer or viewer ──
+  if (role === 'finance_officer' || role === 'viewer') {
+    hideNav('nav-register');
+    hideNav('nav-bulk');
+  }
+
+  // ── Record Payment / Offertory / Tithes: not for viewer ──
+  if (role === 'viewer') {
+    hideNav('nav-payments');
+    hideNav('nav-offertory');
+    hideNav('nav-tithes');
+  }
+
+  // ── Viewer: hide all action buttons globally via CSS class on body ──
+  if (role === 'viewer') {
+    document.body.classList.add('role-viewer');
+  }
+
+  // ── Finance Officer: members view-only (handled in renderMembers via canEdit) ──
 }
 
 async function logout() {
@@ -71,7 +132,14 @@ async function loadDioceses() {
   populateDioceseSelects();
 }
 async function loadChurches() {
-  try { allChurches = await DB.getChurches(); } catch(e) { console.error(e); }
+  try {
+    allChurches = await DB.getChurches();
+    if (profile.role === 'diocese_admin' && profile.diocese) {
+      allChurches = allChurches.filter(c => c.diocese === profile.diocese);
+    } else if (profile.role === 'church_admin' && profile.church) {
+      allChurches = allChurches.filter(c => c.name === profile.church);
+    }
+  } catch(e) { console.error(e); }
   populateChurchSelects();
 }
 async function loadMembers() {
@@ -83,17 +151,57 @@ async function loadMembers() {
   } catch(e) { console.error(e); }
 }
 async function loadPayments() {
-  try { allPayments = await DB.getPayments(); } catch(e) { console.error(e); }
+  try {
+    const filters = {};
+    if (profile.role === 'diocese_admin' && profile.diocese) {
+      // payments don't store diocese directly; filter client-side after fetch
+      allPayments = await DB.getPayments();
+      const memberIds = new Set(allMembers.map(m=>m.id));
+      allPayments = allPayments.filter(p => memberIds.has(p.member_id));
+    } else if (profile.role === 'church_admin' && profile.church) {
+      allPayments = await DB.getPayments();
+      const memberIds = new Set(allMembers.map(m=>m.id));
+      allPayments = allPayments.filter(p => memberIds.has(p.member_id));
+    } else {
+      allPayments = await DB.getPayments();
+    }
+  } catch(e) { console.error(e); }
 }
 async function loadOffertory() {
-  try { allOffertory = await DB.getOffertory(); } catch(e) { console.error(e); }
+  try {
+    const filters = {};
+    if (profile.role === 'diocese_admin' && profile.diocese) filters.diocese = profile.diocese;
+    if (profile.role === 'church_admin' && profile.church) filters.church_name = profile.church;
+    allOffertory = await DB.getOffertory(filters);
+  } catch(e) { console.error(e); }
 }
 async function loadTithes() {
-  try { allTithes = await DB.getTithes(); } catch(e) { console.error(e); }
+  try {
+    const filters = {};
+    if (profile.role === 'diocese_admin' && profile.diocese) filters.diocese = profile.diocese;
+    if (profile.role === 'church_admin' && profile.church) filters.church_name = profile.church;
+    allTithes = await DB.getTithes(filters);
+  } catch(e) { console.error(e); }
 }
 
 // ── NAVIGATION ────────────────────────────────────────────────
 function showPage(id) {
+  // Guard: block access to restricted pages based on role
+  const restricted = {
+    users: ['super_admin'],
+    dioceses: ['super_admin'],
+    churches: ['super_admin','diocese_admin'],
+    register: ['super_admin','diocese_admin','church_admin'],
+    bulk: ['super_admin','diocese_admin','church_admin'],
+    payments: ['super_admin','diocese_admin','church_admin','finance_officer'],
+    offertory: ['super_admin','diocese_admin','church_admin','finance_officer'],
+    tithes: ['super_admin','diocese_admin','church_admin','finance_officer']
+  };
+  if (restricted[id] && !restricted[id].includes(profile.role)) {
+    toast("You don't have permission to access this page.", 'error');
+    return;
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
