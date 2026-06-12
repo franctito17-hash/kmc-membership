@@ -128,6 +128,12 @@ function renderDashboard() {
   setEl('d-tithes', 'KES ' + fmt(titheTotal));
   setEl('d-online', online.length);
 
+  // Subscription stats
+  const subExpected = baptized.length * 600;
+  const subCollected = baptized.reduce((s,m) => s + (m.paid_amount||0), 0);
+  setEl('d-subs', 'KES ' + fmt(subCollected));
+  setEl('d-subs-sub', `of KES ${fmt(subExpected)} expected`);
+
   // Gender chart
   const male = allMembers.filter(m => m.gender === 'Male').length;
   const female = allMembers.filter(m => m.gender === 'Female').length;
