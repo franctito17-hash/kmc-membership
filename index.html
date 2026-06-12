@@ -1,28 +1,78 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KMC — Kenya Mennonite Church</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
+:root{--forest:#1a3a2a;--forest-mid:#2d5a3d;--gold:#c9a84c;--gold-light:#e8c97a;--gold-pale:#f5e9c8;--cream:#faf7f0;--white:#ffffff;--slate:#4a5568;--slate-light:#718096;--border:#e2d9c8;--red:#c0392b;--green:#27ae60;--shadow:0 4px 20px rgba(26,58,42,0.10)}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'DM Sans',sans-serif;background:#1a3a2a;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
-.logo{width:72px;height:72px;background:#c9a84c;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-weight:900;color:#1a3a2a;font-size:24px;margin:0 auto 20px}
-h1{font-family:'Playfair Display',serif;font-size:32px;color:#fff;text-align:center;margin-bottom:8px}
-p{color:rgba(255,255,255,0.6);text-align:center;margin-bottom:40px;font-size:15px}
-.btns{display:flex;gap:16px;flex-wrap:wrap;justify-content:center}
-.btn{padding:14px 32px;border-radius:10px;font-size:15px;font-weight:600;text-decoration:none;font-family:'DM Sans',sans-serif}
-.btn-gold{background:#c9a84c;color:#1a3a2a}
-.btn-outline{background:rgba(255,255,255,0.1);color:#fff;border:1.5px solid rgba(255,255,255,0.25)}
+body{font-family:'DM Sans',sans-serif;background:var(--forest);min-height:100vh;display:flex;flex-direction:column}
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;text-align:center;background:linear-gradient(160deg,#1a3a2a 0%,#2d5a3d 60%,#1a3a2a 100%)}
+.cross-motif{font-size:56px;margin-bottom:20px;opacity:.85}
+h1{font-family:'Playfair Display',serif;font-size:42px;font-weight:900;color:var(--white);line-height:1.1;margin-bottom:10px}
+h1 span{color:var(--gold-light)}
+.tagline{font-size:16px;color:rgba(255,255,255,0.6);max-width:480px;margin:0 auto 48px;line-height:1.7}
+.actions{display:flex;flex-wrap:wrap;gap:16px;justify-content:center}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:16px 32px;border-radius:12px;font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;text-decoration:none;transition:all .2s}
+.btn-primary{background:var(--gold);color:var(--forest)}
+.btn-primary:hover{background:var(--gold-light);transform:translateY(-1px);box-shadow:0 8px 24px rgba(201,168,76,0.4)}
+.btn-secondary{background:rgba(255,255,255,0.1);color:var(--white);border:1.5px solid rgba(255,255,255,0.25)}
+.btn-secondary:hover{background:rgba(255,255,255,0.18);transform:translateY(-1px)}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;max-width:900px;margin:60px auto 0;width:100%}
+.feat{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:24px;text-align:left}
+.feat-icon{font-size:28px;margin-bottom:12px}
+.feat h3{font-size:15px;font-weight:600;color:var(--white);margin-bottom:6px}
+.feat p{font-size:13px;color:rgba(255,255,255,0.55);line-height:1.6}
+.footer{background:rgba(0,0,0,0.2);padding:20px 32px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.footer p{font-size:12.5px;color:rgba(255,255,255,0.4)}
+.setup-banner{background:rgba(201,168,76,0.15);border:1px solid rgba(201,168,76,0.3);border-radius:12px;padding:18px 24px;max-width:700px;margin:32px auto 0;text-align:left}
+.setup-banner h3{color:var(--gold-light);font-size:13.5px;font-weight:600;margin-bottom:8px}
+.setup-banner ol{padding-left:18px;font-size:12.5px;color:rgba(255,255,255,0.65);line-height:2.2}
+.setup-banner code{font-family:'DM Mono',monospace;background:rgba(255,255,255,0.1);padding:2px 6px;border-radius:4px;font-size:12px;color:var(--gold-light)}
+@media(max-width:600px){h1{font-size:28px}.btn{padding:13px 22px;font-size:14px}}
 </style>
 </head>
 <body>
-<div class="logo">KMC</div>
-<h1>Kenya Mennonite Church</h1>
-<p>Membership Information System</p>
-<div class="btns">
-  <a href="login.html" class="btn btn-gold">🔐 Admin Login</a>
-  <a href="register-public.html" class="btn btn-outline">📝 Member Registration</a>
+
+<div class="hero">
+  <div class="cross-motif">✝</div>
+  <h1>Kenya Mennonite Church<br><span>Membership System</span></h1>
+  <p class="tagline">Unified digital platform for membership management, church finances, offertory tracking, and multi-diocesan administration.</p>
+
+  <div class="actions">
+    <a href="login.html" class="btn btn-primary">🔐 Admin Login</a>
+    <a href="register-public.html" class="btn btn-secondary">📝 Member Registration</a>
+    <a href="pay-subscription.html" class="btn btn-secondary">💰 Pay Subscription</a>
+  </div>
+
+  <div class="setup-banner">
+    <h3>⚙️ First-time setup — complete these steps before using</h3>
+    <ol>
+      <li>Create a free project at <code>supabase.com</code></li>
+      <li>Go to <strong>SQL Editor</strong> → paste &amp; run <code>supabase/schema.sql</code></li>
+      <li>Open <code>kmc-config.js</code> → replace <code>YOUR_PROJECT_ID</code> and <code>YOUR_ANON_PUBLIC_KEY</code></li>
+      <li>In Supabase → <strong>Authentication → Users</strong> → invite your first admin</li>
+      <li>In Supabase → <strong>Table Editor → admin_users</strong> → add a row with that user's <code>auth_id</code>, set role to <code>super_admin</code></li>
+      <li>Deploy these files to <strong>Netlify</strong> (free) or any static host — done!</li>
+    </ol>
+  </div>
+
+  <div class="features">
+    <div class="feat"><div class="feat-icon">👥</div><h3>Member Management</h3><p>Full CRUD, bulk CSV upload, advanced filtering by diocese, church, status and subscription.</p></div>
+    <div class="feat"><div class="feat-icon">📝</div><h3>Public Registration</h3><p>Members self-register online in a 4-step form. Data flows directly to the database.</p></div>
+    <div class="feat"><div class="feat-icon">🙏</div><h3>Offertory &amp; Tithes</h3><p>Record service collections with cash/M-Pesa/cheque breakdown per church after every service.</p></div>
+    <div class="feat"><div class="feat-icon">💰</div><h3>Subscription Finance</h3><p>Track KES 600 annual subscriptions, generate receipts, and export payment records.</p></div>
+    <div class="feat"><div class="feat-icon">🏛️</div><h3>Multi-Diocesan Sync</h3><p>Role-based access: Super Admin, Diocese Admin, Church Admin, Finance Officer, Viewer.</p></div>
+    <div class="feat"><div class="feat-icon">📊</div><h3>Reports &amp; Analytics</h3><p>Membership, financial, church, diocese, and offertory summary reports with CSV export.</p></div>
+  </div>
 </div>
+
+<div class="footer">
+  <p>© 2026 Kenya Mennonite Church — Membership Information System</p>
+  <p style="color:rgba(255,255,255,0.3);font-size:11px">Built with Supabase + Vanilla JS · Deploy free on Netlify</p>
+</div>
+
 </body>
 </html>
