@@ -1225,9 +1225,9 @@ async function saveUser() {
       });
     }
 
-    toast(`✅ Admin account created! Share these credentials: ${email} / ${password}`, 'success');
     closeModal('modal-user');
     renderUsers();
+    showCredentialsBox(name, email, password, row.role);
   } catch(e) {
     toast('Error: '+(e.message||'Could not create user'), 'error');
   } finally {
@@ -1241,6 +1241,26 @@ function generateTempPassword() {
   const word = words[Math.floor(Math.random()*words.length)];
   const num = Math.floor(1000+Math.random()*9000);
   return `${word}@${num}!`;
+}
+
+function showCredentialsBox(name, email, password, role) {
+  const loginUrl = window.location.origin + '/login.html';
+  const box = document.createElement('div');
+  box.className = 'modal-overlay open';
+  box.innerHTML = `
+    <div class="modal" style="max-width:460px;text-align:center">
+      <div style="font-size:48px;margin-bottom:8px">✅</div>
+      <h2 style="font-family:'Playfair Display',serif;color:var(--forest);margin-bottom:6px">Admin Account Created!</h2>
+      <p style="color:var(--slate-light);font-size:13.5px;margin-bottom:20px">Share these login details with <strong>${name}</strong> (${formatRole(role)})</p>
+      <div style="background:var(--gold-pale);border-radius:10px;padding:18px;text-align:left;margin-bottom:18px">
+        <div style="margin-bottom:10px"><div style="font-size:11px;color:var(--slate-light);text-transform:uppercase;letter-spacing:0.5px">Login URL</div><div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--forest)">${loginUrl}</div></div>
+        <div style="margin-bottom:10px"><div style="font-size:11px;color:var(--slate-light);text-transform:uppercase;letter-spacing:0.5px">Email</div><div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--forest)">${email}</div></div>
+        <div><div style="font-size:11px;color:var(--slate-light);text-transform:uppercase;letter-spacing:0.5px">Temporary Password</div><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--forest)">${password}</div></div>
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="navigator.clipboard.writeText('Login: ${loginUrl}\\nEmail: ${email}\\nPassword: ${password}').then(()=>toast('Copied to clipboard!','success'))">📋 Copy All Details</button>
+      <button class="btn btn-outline" style="width:100%" onclick="this.closest('.modal-overlay').remove()">Close</button>
+    </div>`;
+  document.body.appendChild(box);
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
