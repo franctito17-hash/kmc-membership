@@ -724,6 +724,7 @@ textarea{resize:vertical;min-height:80px}
     <div class="form-grid">
       <div class="form-group"><label>Full Name *</label><input type="text" id="u-name"></div>
       <div class="form-group"><label>Email *</label><input type="email" id="u-email"></div>
+      <div class="form-group" id="u-password-group"><label>Temporary Password *</label><input type="text" id="u-password" placeholder="e.g. Kmc@2026!"></div>
       <div class="form-group"><label>Role *</label>
         <select id="u-role" onchange="toggleUserScope()">
           <option value="viewer">Viewer</option>
@@ -737,8 +738,8 @@ textarea{resize:vertical;min-height:80px}
       <div class="form-group" id="u-diocese-group"><label>Diocese Scope</label><select id="u-diocese"><option value="">All (national)</option></select></div>
       <div class="form-group" id="u-church-group"><label>Church Scope</label><select id="u-church"><option value="">All in diocese</option></select></div>
     </div>
-    <div style="background:var(--gold-pale);border-radius:8px;padding:12px;margin-top:16px;font-size:12.5px;color:var(--slate)">
-      💡 After saving, create the user's login in <strong>Supabase → Authentication → Users</strong>, then link the <strong>auth_id</strong> to this record.
+    <div style="background:var(--gold-pale);border-radius:8px;padding:12px;margin-top:16px;font-size:12.5px;color:var(--slate)" id="u-help-text">
+      💡 This creates both the <strong>login account</strong> and the <strong>admin profile</strong> automatically. Share the email + temporary password with the new admin — they should change it after first login.
     </div>
     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-outline" onclick="closeModal('modal-user')">Cancel</button>
