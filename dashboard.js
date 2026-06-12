@@ -10,6 +10,8 @@ let editingMemberId = null;
 let payingMemberId = null;
 let bulkRows = [];
 let selectedTitheMemberId = null;
+let allPendingPayments = [];
+let pendingTabFilter = 'Pending';
 
 // ── INIT ──────────────────────────────────────────────────────
 async function init() {
@@ -51,6 +53,7 @@ async function init() {
   // Load all data
   await Promise.all([loadDioceses(), loadChurches()]);
   await Promise.all([loadMembers(), loadPayments(), loadOffertory(), loadTithes()]);
+  await loadPendingPayments();
 
   renderDashboard();
   document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
@@ -108,6 +111,7 @@ function applyRoleRestrictions() {
   // ── Record Payment / Offertory / Tithes: not for viewer ──
   if (role === 'viewer') {
     hideNav('nav-payments');
+    hideNav('nav-pending');
     hideNav('nav-offertory');
     hideNav('nav-tithes');
   }
@@ -194,6 +198,7 @@ function showPage(id) {
     register: ['super_admin','diocese_admin','church_admin'],
     bulk: ['super_admin','diocese_admin','church_admin'],
     payments: ['super_admin','diocese_admin','church_admin','finance_officer'],
+    pending: ['super_admin','diocese_admin','church_admin','finance_officer'],
     offertory: ['super_admin','diocese_admin','church_admin','finance_officer'],
     tithes: ['super_admin','diocese_admin','church_admin','finance_officer']
   };
@@ -214,7 +219,7 @@ function showPage(id) {
     members: renderMembers, dioceses: renderDioceses, churches: renderChurches,
     leadership: renderLeadership, subscriptions: renderSubscriptions,
     offertory: renderOffertory, tithes: renderTithes, reports: () => reportTab('membership', document.querySelector('.tab')),
-    users: renderUsers
+    users: renderUsers, pending: renderPendingPayments
   };
   if (renders[id]) renders[id]();
 }
@@ -241,6 +246,10 @@ function renderDashboard() {
   const subCollected = baptized.reduce((s,m) => s + (m.paid_amount||0), 0);
   setEl('d-subs', 'KES ' + fmt(subCollected));
   setEl('d-subs-sub', `of KES ${fmt(subExpected)} expected`);
+
+  // Pending payments
+  const pendingCount = allPendingPayments.filter(p=>p.status==='Pending').length;
+  setEl('d-pending', pendingCount);
 
   // Gender chart
   const male = allMembers.filter(m => m.gender === 'Male').length;
@@ -886,7 +895,112 @@ async function recordPayment() {
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
-// ── OFFERTORY ─────────────────────────────────────────────────
+// ── PENDING M-PESA PAYMENTS ──────────────────────────────────────
+async function loadPendingPayments() {
+  try {
+    allPendingPayments = await DB.getPendingPayments();
+    // Scope to role
+    if (profile.role === 'diocese_admin' && profile.diocese) {
+      const memberIds = new Set(allMembers.map(m=>m.id));
+      allPendingPayments = allPendingPayments.filter(p => memberIds.has(p.member_id));
+    } else if (profile.role === 'church_admin' && profile.church) {
+      const memberIds = new Set(allMembers.map(m=>m.id));
+      allPendingPayments = allPendingPayments.filter(p => memberIds.has(p.member_id));
+    }
+    const pendingCount = allPendingPayments.filter(p=>p.status==='Pending').length;
+    const badge = document.getElementById('pending-badge');
+    if (badge) {
+      if (pendingCount > 0) { badge.textContent = pendingCount; badge.style.display='inline-block'; }
+      else badge.style.display='none';
+    }
+  } catch(e) { console.error(e); }
+}
+
+function pendingTab(status, el) {
+  pendingTabFilter = status;
+  document.querySelectorAll('#page-pending .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  renderPendingPayments();
+}
+
+function renderPendingPayments() {
+  const all = allPendingPayments;
+  const pending = all.filter(p=>p.status==='Pending');
+  const today = new Date().toISOString().split('T')[0];
+  const approvedToday = all.filter(p=>p.status==='Approved' && p.reviewed_at && p.reviewed_at.startsWith(today));
+  const rejected = all.filter(p=>p.status==='Rejected');
+
+  setEl('pend-total', pending.length);
+  setEl('pend-amount', 'KES ' + fmt(pending.reduce((s,p)=>s+(p.amount||0),0)));
+  setEl('pend-approved', approvedToday.length);
+  setEl('pend-rejected', rejected.length);
+
+  const filtered = all.filter(p=>p.status===pendingTabFilter);
+
+  document.getElementById('pending-tbody').innerHTML = filtered.length ? filtered.map(p=>{
+    const statusClass = p.status==='Pending'?'badge-partial':p.status==='Approved'?'badge-paid':'badge-unpaid';
+    let actions = '';
+    if (p.status === 'Pending') {
+      actions = `
+        <button class="btn btn-success btn-sm" onclick="approvePending('${p.id}')">✅ Approve</button>
+        <button class="btn btn-danger btn-sm" onclick="openRejectModal('${p.id}')">🚫 Reject</button>`;
+    } else if (p.status === 'Rejected' && p.rejection_reason) {
+      actions = `<span style="font-size:11.5px;color:var(--red)" title="${p.rejection_reason}">Reason: ${p.rejection_reason.slice(0,30)}${p.rejection_reason.length>30?'…':''}</span>`;
+    } else {
+      actions = `<span style="font-size:11.5px;color:var(--slate-light)">by ${p.reviewed_by||'—'}</span>`;
+    }
+    return `<tr>
+      <td>${p.created_at?p.created_at.split('T')[0]:'—'}</td>
+      <td><strong>${p.member_name||'—'}</strong><br><span style="font-size:11px;color:var(--slate-light)">${p.member_id||''}</span></td>
+      <td>${p.member_phone||'—'}</td>
+      <td><strong>KES ${fmt(p.amount)}</strong></td>
+      <td><span style="font-family:'DM Mono',monospace;font-weight:600">${p.mpesa_code}</span></td>
+      <td>${p.mpesa_phone||'—'}</td>
+      <td>${p.payment_date||'—'}</td>
+      <td><span class="badge ${statusClass}">${p.status}</span></td>
+      <td style="white-space:nowrap">${actions}</td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--slate-light)">No ${pendingTabFilter.toLowerCase()} submissions</td></tr>`;
+}
+
+async function approvePending(id) {
+  const p = allPendingPayments.find(x=>x.id===id);
+  if (!p) return;
+  if (!confirm(`Approve KES ${fmt(p.amount)} payment from ${p.member_name}?\nThis will record it as a verified subscription payment.`)) return;
+
+  try {
+    await DB.approvePendingPayment(p, profile.full_name);
+    toast('Payment approved and recorded!', 'success');
+    // Update local member paid_amount
+    const m = allMembers.find(x=>x.id===p.member_id);
+    if (m) m.paid_amount = (m.paid_amount||0) + p.amount;
+    await loadPendingPayments();
+    await loadPayments();
+    renderPendingPayments();
+    renderDashboard();
+  } catch(e) { toast('Error: '+e.message, 'error'); }
+}
+
+function openRejectModal(id) {
+  document.getElementById('reject-pending-id').value = id;
+  document.getElementById('reject-reason').value = '';
+  openModal('modal-reject');
+}
+
+async function confirmRejectPending() {
+  const id = document.getElementById('reject-pending-id').value;
+  const reason = document.getElementById('reject-reason').value.trim();
+  if (!reason) { toast('Please provide a reason for rejection.', 'error'); return; }
+  try {
+    await DB.rejectPendingPayment(id, profile.full_name, reason);
+    toast('Payment submission rejected.', 'success');
+    closeModal('modal-reject');
+    await loadPendingPayments();
+    renderPendingPayments();
+  } catch(e) { toast('Error: '+e.message, 'error'); }
+}
+
+
 function renderOffertory() {
   const churchFilter = document.getElementById('off-filter-church').value;
   const typeFilter = document.getElementById('off-filter-type').value;
