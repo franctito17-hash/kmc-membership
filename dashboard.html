@@ -195,6 +195,7 @@ body.role-viewer .page-header-left .page-subtitle::after {
       <div class="nav-section-label">Finance</div>
       <div class="nav-item" onclick="showPage('subscriptions')"><span class="icon">💰</span>Subscriptions</div>
       <div class="nav-item" id="nav-payments" onclick="showPage('payments')"><span class="icon">🧾</span>Record Payment</div>
+      <div class="nav-item" id="nav-pending" onclick="showPage('pending')"><span class="icon">⏳</span>Pending Payments<span id="pending-badge" style="display:none;background:var(--red);color:#fff;border-radius:100px;font-size:10px;padding:2px 7px;margin-left:6px;font-weight:700"></span></div>
       <div class="nav-item" id="nav-offertory" onclick="showPage('offertory')"><span class="icon">🙏</span>Offertory</div>
       <div class="nav-item" id="nav-tithes" onclick="showPage('tithes')"><span class="icon">📿</span>Tithes</div>
     </div>
@@ -229,6 +230,7 @@ body.role-viewer .page-header-left .page-subtitle::after {
         <div class="stat-card green"><div class="stat-label">Total Tithes</div><div class="stat-value" id="d-tithes" style="font-size:22px">—</div><div class="stat-sub">All records (KES)</div><div class="stat-icon">📿</div></div>
         <div class="stat-card blue"><div class="stat-label">Online Registrations</div><div class="stat-value" id="d-online">—</div><div class="stat-sub">Self-registered online</div><div class="stat-icon">🌐</div></div>
         <div class="stat-card" style="border-top-color:var(--gold)"><div class="stat-label">Subscriptions</div><div class="stat-value" id="d-subs" style="font-size:22px">—</div><div class="stat-sub" id="d-subs-sub">Collected / Expected</div><div class="stat-icon">💰</div></div>
+        <div class="stat-card red"><div class="stat-label">Pending Verification</div><div class="stat-value" id="d-pending" style="cursor:pointer" onclick="showPage('pending')">—</div><div class="stat-sub">M-Pesa submissions awaiting review</div><div class="stat-icon">⏳</div></div>
       </div>
       <div class="charts-row">
         <div class="chart-card">
@@ -456,6 +458,28 @@ body.role-viewer .page-header-left .page-subtitle::after {
         </div>
         <div id="receipt-area"></div>
       </div>
+    </div>
+
+    <!-- ======= PENDING PAYMENTS ======= -->
+    <div class="page" id="page-pending">
+      <div class="page-header">
+        <div class="page-header-left"><div class="page-title">Pending M-Pesa Payments</div><div class="page-subtitle">Subscription payments submitted by members for verification</div></div>
+      </div>
+      <div class="finance-banner">
+        <div class="fb-item"><div class="fb-value" id="pend-total">—</div><div class="fb-label">Pending</div></div>
+        <div class="fb-item"><div class="fb-value" id="pend-amount">—</div><div class="fb-label">Total Amount (KES)</div></div>
+        <div class="fb-item"><div class="fb-value" id="pend-approved">—</div><div class="fb-label">Approved Today</div></div>
+        <div class="fb-item"><div class="fb-value" id="pend-rejected">—</div><div class="fb-label">Rejected</div></div>
+      </div>
+      <div class="tabs">
+        <div class="tab active" onclick="pendingTab('Pending',this)">Pending</div>
+        <div class="tab" onclick="pendingTab('Approved',this)">Approved</div>
+        <div class="tab" onclick="pendingTab('Rejected',this)">Rejected</div>
+      </div>
+      <div class="card"><div style="overflow-x:auto"><table>
+        <thead><tr><th>Submitted</th><th>Member</th><th>Phone</th><th>Amount</th><th>M-Pesa Code</th><th>M-Pesa Phone</th><th>Payment Date</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="pending-tbody"><tr class="loading-row"><td colspan="9">Loading…</td></tr></tbody>
+      </table></div></div>
     </div>
 
     <!-- ======= OFFERTORY ======= -->
@@ -724,6 +748,25 @@ body.role-viewer .page-header-left .page-subtitle::after {
     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-outline" onclick="closeModal('modal-tithe')">Cancel</button>
       <button class="btn btn-primary" onclick="saveTithe()">💾 Save Tithe</button>
+    </div>
+  </div>
+</div>
+
+<!-- REJECT PENDING PAYMENT MODAL -->
+<div class="modal-overlay" id="modal-reject">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <div class="modal-title">Reject Payment Submission</div>
+      <button class="modal-close" onclick="closeModal('modal-reject')">✕</button>
+    </div>
+    <input type="hidden" id="reject-pending-id">
+    <div class="form-group">
+      <label>Reason for rejection</label>
+      <textarea id="reject-reason" placeholder="e.g. M-Pesa code not found in statement, wrong amount, duplicate submission..." style="min-height:90px"></textarea>
+    </div>
+    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeModal('modal-reject')">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmRejectPending()">🚫 Reject</button>
     </div>
   </div>
 </div>
