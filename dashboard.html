@@ -131,6 +131,21 @@ textarea{resize:vertical;min-height:80px}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(26,58,42,0.2);border-radius:10px}
+
+/* Viewer role: read-only — hide all mutating action buttons */
+body.role-viewer .btn-primary,
+body.role-viewer .btn-danger,
+body.role-viewer .btn-gold,
+body.role-viewer .page-actions .btn,
+body.role-viewer .card-header .btn,
+body.role-viewer td .btn-sm:not(:first-child) {
+  display: none !important;
+}
+body.role-viewer .page-header-left .page-subtitle::after {
+  content: " (Read-only access)";
+  color: var(--slate-light);
+  font-style: italic;
+}
 @media(max-width:768px){.sidebar{display:none}.charts-row{grid-template-columns:1fr}.main-content{padding:20px}}
 </style>
 </head>
@@ -167,29 +182,29 @@ textarea{resize:vertical;min-height:80px}
     <div class="nav-section">
       <div class="nav-section-label">Membership</div>
       <div class="nav-item" onclick="showPage('members')"><span class="icon">👥</span>Members</div>
-      <div class="nav-item" onclick="showPage('register')"><span class="icon">➕</span>Register Member</div>
-      <div class="nav-item" onclick="showPage('bulk')"><span class="icon">📤</span>Bulk Upload</div>
+      <div class="nav-item" id="nav-register" onclick="showPage('register')"><span class="icon">➕</span>Register Member</div>
+      <div class="nav-item" id="nav-bulk" onclick="showPage('bulk')"><span class="icon">📤</span>Bulk Upload</div>
     </div>
-    <div class="nav-section">
+    <div class="nav-section" id="section-structure">
       <div class="nav-section-label">Church Structure</div>
-      <div class="nav-item" onclick="showPage('dioceses')"><span class="icon">🏛️</span>Dioceses</div>
-      <div class="nav-item" onclick="showPage('churches')"><span class="icon">⛪</span>Churches</div>
+      <div class="nav-item" id="nav-dioceses" onclick="showPage('dioceses')"><span class="icon">🏛️</span>Dioceses</div>
+      <div class="nav-item" id="nav-churches" onclick="showPage('churches')"><span class="icon">⛪</span>Churches</div>
       <div class="nav-item" onclick="showPage('leadership')"><span class="icon">👑</span>Leadership</div>
     </div>
     <div class="nav-section">
       <div class="nav-section-label">Finance</div>
       <div class="nav-item" onclick="showPage('subscriptions')"><span class="icon">💰</span>Subscriptions</div>
-      <div class="nav-item" onclick="showPage('payments')"><span class="icon">🧾</span>Record Payment</div>
-      <div class="nav-item" onclick="showPage('offertory')"><span class="icon">🙏</span>Offertory</div>
-      <div class="nav-item" onclick="showPage('tithes')"><span class="icon">📿</span>Tithes</div>
+      <div class="nav-item" id="nav-payments" onclick="showPage('payments')"><span class="icon">🧾</span>Record Payment</div>
+      <div class="nav-item" id="nav-offertory" onclick="showPage('offertory')"><span class="icon">🙏</span>Offertory</div>
+      <div class="nav-item" id="nav-tithes" onclick="showPage('tithes')"><span class="icon">📿</span>Tithes</div>
     </div>
     <div class="nav-section">
       <div class="nav-section-label">Analytics</div>
       <div class="nav-item" onclick="showPage('reports')"><span class="icon">📊</span>Reports</div>
     </div>
-    <div class="nav-section">
+    <div class="nav-section" id="section-system">
       <div class="nav-section-label">System</div>
-      <div class="nav-item" onclick="showPage('users')"><span class="icon">🔐</span>Users &amp; Roles</div>
+      <div class="nav-item" id="nav-users" onclick="showPage('users')"><span class="icon">🔐</span>Users &amp; Roles</div>
     </div>
   </nav>
 
