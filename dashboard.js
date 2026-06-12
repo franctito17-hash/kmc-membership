@@ -1133,6 +1133,8 @@ function openUserModal(editId = null) {
   document.getElementById('u-diocese').innerHTML = '<option value="">All (national)</option>'+allDioceses.map(d=>`<option>${d.name}</option>`).join('');
   document.getElementById('u-church').innerHTML = '<option value="">All in diocese</option>'+allChurches.map(c=>`<option>${c.name}</option>`).join('');
   if (editId) {
+    document.getElementById('u-password-group').style.display = 'none';
+    document.getElementById('u-help-text').style.display = 'none';
     DB.getAdminUsers().then(users=>{
       const u=users.find(x=>x.id===editId);
       if(u){
@@ -1146,7 +1148,10 @@ function openUserModal(editId = null) {
       }
     });
   } else {
+    document.getElementById('u-password-group').style.display = 'flex';
+    document.getElementById('u-help-text').style.display = 'block';
     document.getElementById('u-name').value=''; document.getElementById('u-email').value='';
+    document.getElementById('u-password').value=generateTempPassword();
     document.getElementById('u-role').value='viewer'; document.getElementById('u-active').value='true';
   }
   toggleUserScope();
@@ -1171,13 +1176,71 @@ async function saveUser() {
     diocese:document.getElementById('u-diocese').value||null,
     church:document.getElementById('u-church').value||null
   };
-  if(editId) row.id=editId;
-  try{
+
+  const btn = event.target;
+  const origText = btn.textContent;
+
+  if (editId) {
+    row.id=editId;
+    try{
+      await DB.saveAdminUser(row);
+      toast('User updated!','success');
+      closeModal('modal-user');
+      renderUsers();
+    }catch(e){toast('Error: '+e.message,'error');}
+    return;
+  }
+
+  // NEW USER — create auth account + admin profile
+  const password = document.getElementById('u-password').value.trim();
+  if (!password || password.length < 6) {
+    toast('Password must be at least 6 characters.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Creating account…';
+
+  // Save current admin's session so we can restore it after signUp
+  const currentSession = await Auth.getSession();
+
+  try {
+    // 1. Create the Supabase Auth account (this may switch the active session)
+    const { data: signUpData, error: signUpError } = await _sb.auth.signUp({
+      email, password,
+      options: { data: { full_name: name } }
+    });
+    if (signUpError) throw signUpError;
+    if (!signUpData.user) throw new Error('Account creation did not return a user. The email may already be registered.');
+
+    // 2. Create the admin profile linked to that auth account
+    row.auth_id = signUpData.user.id;
     await DB.saveAdminUser(row);
-    toast(editId?'User updated!':'User added!','success');
+
+    // 3. Restore the original admin's session
+    if (currentSession) {
+      await _sb.auth.setSession({
+        access_token: currentSession.access_token,
+        refresh_token: currentSession.refresh_token
+      });
+    }
+
+    toast(`✅ Admin account created! Share these credentials: ${email} / ${password}`, 'success');
     closeModal('modal-user');
     renderUsers();
-  }catch(e){toast('Error: '+e.message,'error');}
+  } catch(e) {
+    toast('Error: '+(e.message||'Could not create user'), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+}
+
+function generateTempPassword() {
+  const words = ['Kmc','Faith','Grace','Hope','Mercy','Bless','Glory','Joy'];
+  const word = words[Math.floor(Math.random()*words.length)];
+  const num = Math.floor(1000+Math.random()*9000);
+  return `${word}@${num}!`;
 }
 
 // ── HELPERS ───────────────────────────────────────────────────
