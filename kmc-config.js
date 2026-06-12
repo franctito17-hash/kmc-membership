@@ -4,8 +4,8 @@
 // ============================================================
 
 // ── CONFIGURE YOUR SUPABASE PROJECT HERE ──────────────────────
-const SUPABASE_URL  = 'https://bbcaybyaldpcwxplcgvn.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJiY2F5YnlhbGRwY3d4cGxjZ3ZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4OTg4MDQsImV4cCI6MjA5NjQ3NDgwNH0.gdil7MarkiPC4hXpekChxznyKQga8cjdxME9vMTCNvY';
+const SUPABASE_URL  = 'https://hgpfmdgxupdesakalfyr.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhncGZtZGd4dXBkZXNha2FsZnlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MjcwOTMsImV4cCI6MjA5NjUwMzA5M30.kXdwfQUY8IGh9TBEhO-o8NO3-3LGLIpKSYgWy4O-Nlc';
 // ──────────────────────────────────────────────────────────────
 
 // Load Supabase JS from CDN (v2)
@@ -151,6 +151,45 @@ const DB = {
     const newPaid = (member.paid_amount || 0) + row.amount;
     await _sb.from('members').update({ paid_amount: newPaid }).eq('id', row.member_id);
     return data;
+  },
+
+  // PENDING M-PESA PAYMENTS (public self-reported)
+  async submitPendingPayment(row) {
+    const { data, error } = await _sb.from('pending_payments').insert(row).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async getPendingPayments(status = null) {
+    let q = _sb.from('pending_payments').select('*').order('created_at', { ascending: false });
+    if (status) q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  },
+  async approvePendingPayment(pending, reviewerName) {
+    // 1. Create the real payment record
+    const now = new Date();
+    await DB.savePayment({
+      member_id: pending.member_id,
+      member_name: pending.member_name,
+      amount: pending.amount,
+      method: 'M-Pesa',
+      reference: pending.mpesa_code,
+      payment_date: pending.payment_date,
+      financial_year: String(now.getFullYear()),
+      recorded_by: reviewerName
+    });
+    // 2. Mark pending as approved
+    const { error } = await _sb.from('pending_payments')
+      .update({ status: 'Approved', reviewed_by: reviewerName, reviewed_at: now.toISOString() })
+      .eq('id', pending.id);
+    if (error) throw error;
+  },
+  async rejectPendingPayment(id, reviewerName, reason) {
+    const { error } = await _sb.from('pending_payments')
+      .update({ status: 'Rejected', reviewed_by: reviewerName, reviewed_at: new Date().toISOString(), rejection_reason: reason||'' })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // OFFERTORY
