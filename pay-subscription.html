@@ -1,0 +1,39 @@
+-- ============================================================
+-- Pending M-Pesa Subscription Payments
+-- Members self-report M-Pesa codes; admins verify & approve
+-- ============================================================
+
+create table if not exists pending_payments (
+  id            uuid primary key default gen_random_uuid(),
+  member_id     text references members(id) on delete cascade,
+  member_name   text,
+  member_phone  text,
+  amount        numeric(10,2) not null default 600,
+  mpesa_code    text not null,
+  mpesa_phone   text,
+  payment_date  date not null,
+  status        text default 'Pending' check (status in ('Pending','Approved','Rejected')),
+  reviewed_by   text,
+  reviewed_at   timestamptz,
+  rejection_reason text,
+  created_at    timestamptz default now()
+);
+
+alter table pending_payments enable row level security;
+
+-- Public can insert (members submitting their M-Pesa code)
+create policy "Public insert pending payments"
+  on pending_payments for insert
+  with check (true);
+
+-- Authenticated admins can do everything
+create policy "Admins manage pending payments"
+  on pending_payments for all
+  to authenticated
+  using (true)
+  with check (true);
+
+-- Public can read their own (optional, for status check) - kept open for simplicity
+create policy "Public read pending payments"
+  on pending_payments for select
+  using (true);
