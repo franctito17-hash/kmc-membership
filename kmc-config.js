@@ -112,13 +112,23 @@ const DB = {
     if (error) throw error;
     return data;
   },
-  async saveMember(row) {
+ async saveMember(row) {
     if (row.id) {
       const { id, created_at, ...rest } = row;
       const { data, error } = await _sb.from('members').update(rest).eq('id', id).select().single();
       if (error) throw error;
       return data;
     } else {
+      // Generate correct next ID from actual max in database
+      const { data: last } = await _sb.from('members')
+        .select('id')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const lastNum = last?.[0]?.id
+        ? parseInt(last[0].id.replace('KMC-', '')) || 0
+        : 0;
+      row.id = 'KMC-' + String(lastNum + 1).padStart(4, '0');
+
       const { data, error } = await _sb.from('members').insert(row).select().single();
       if (error) throw error;
       return data;
