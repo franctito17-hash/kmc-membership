@@ -51,7 +51,7 @@ const Auth = {
 const DB = {
   // DIOCESES
   async getDioceses() {
-    const { data, error } = await _sb.from('dioceses').select('*').order('name');
+    const { data, error } = await _sb.from('dioceses').select('*').order('id');
     if (error) throw error;
     return data || [];
   },
@@ -74,7 +74,7 @@ const DB = {
 
   // CHURCHES
   async getChurches(dioceseName = null) {
-    let q = _sb.from('churches').select('*').order('name');
+    let q = _sb.from('churches').select('*').order('id');
     if (dioceseName) q = q.eq('diocese', dioceseName);
     const { data, error } = await q;
     if (error) throw error;
