@@ -51,7 +51,7 @@ const Auth = {
 const DB = {
   // DIOCESES
   async getDioceses() {
-    const { data, error } = await _sb.from('dioceses').select('*').order('id');
+    const { data, error } = await _sb.from('dioceses').select('*').order('sort_order', {ascending: true});
     if (error) throw error;
     return data || [];
   },
@@ -74,7 +74,7 @@ const DB = {
 
   // CHURCHES
   async getChurches(dioceseName = null) {
-    let q = _sb.from('churches').select('*').order('id');
+    let q = _sb.from('churches').select('*').order('sort_order', {ascending: true});
     if (dioceseName) q = q.eq('diocese', dioceseName);
     const { data, error } = await q;
     if (error) throw error;
@@ -111,6 +111,7 @@ const DB = {
     const { data, error } = await _sb.from('members').select('*').eq('id', id).single();
     if (error) throw error;
     return data;
+  },
   async saveMember(row) {
     if (row.id) {
       const { id, created_at, ...rest } = row;
