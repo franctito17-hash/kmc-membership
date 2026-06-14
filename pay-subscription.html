@@ -1,39 +1,264 @@
--- ============================================================
--- Pending M-Pesa Subscription Payments
--- Members self-report M-Pesa codes; admins verify & approve
--- ============================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KMC — Pay Subscription</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --forest: #1a3a2a; --forest-mid: #2d5a3d; --forest-light: #3d7a52;
+  --gold: #c9a84c; --gold-light: #e8c97a; --gold-pale: #f5e9c8;
+  --cream: #faf7f0; --white: #ffffff;
+  --slate: #4a5568; --slate-light: #718096; --border: #e2d9c8;
+  --red: #c0392b; --red-pale: #fef0ee; --green: #27ae60; --green-pale: #eafaf1;
+  --shadow: 0 4px 20px rgba(26,58,42,0.10);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);min-height:100vh}
+.top-bar{background:var(--forest);padding:0 32px;height:64px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{width:40px;height:40px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-weight:900;color:var(--forest);font-size:15px}
+.logo-text strong{font-family:'Playfair Display',serif;font-size:17px;color:#fff;display:block;line-height:1.1}
+.logo-text span{font-size:11px;color:rgba(255,255,255,0.55);letter-spacing:0.4px}
+.hero{background:linear-gradient(135deg,var(--forest) 0%,var(--forest-mid) 100%);padding:44px 32px;text-align:center;color:white}
+.hero h1{font-family:'Playfair Display',serif;font-size:28px;font-weight:700;margin-bottom:8px}
+.hero p{font-size:14px;color:rgba(255,255,255,0.7);max-width:480px;margin:0 auto;line-height:1.6}
+.wrap{max-width:560px;margin:0 auto;padding:32px 20px 60px}
+.card{background:var(--white);border-radius:16px;box-shadow:var(--shadow);border:1px solid var(--border);padding:26px 28px;margin-bottom:20px}
+.card-title{font-family:'Playfair Display',serif;font-size:17px;font-weight:600;color:var(--forest);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.steps-list{counter-reset:step}
+.step-item{display:flex;gap:14px;margin-bottom:16px;align-items:flex-start}
+.step-num{width:28px;height:28px;background:var(--gold-pale);color:var(--forest);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0}
+.step-text{font-size:14px;color:var(--slate);line-height:1.6;padding-top:3px}
+.step-text strong{color:var(--forest)}
+.paybill-box{background:var(--gold-pale);border:2px dashed var(--gold);border-radius:12px;padding:18px;text-align:center;margin:16px 0}
+.paybill-box .label{font-size:11px;color:var(--slate-light);text-transform:uppercase;letter-spacing:0.6px;margin-bottom:4px}
+.paybill-box .value{font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--forest)}
+.paybill-row{display:flex;justify-content:space-around;gap:12px;flex-wrap:wrap}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-group.full{grid-column:1/-1}
+label{font-size:12.5px;font-weight:600;color:var(--forest)}
+input,select{padding:11px 13px;border:1.5px solid var(--border);border-radius:8px;font-size:13.5px;font-family:'DM Sans',sans-serif;color:var(--forest);background:var(--white);outline:none;transition:border .18s}
+input:focus,select:focus{border-color:var(--forest-mid)}
+.btn-submit{width:100%;background:var(--forest);color:var(--white);border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;margin-top:18px;transition:background .18s}
+.btn-submit:hover{background:var(--forest-mid)}
+.btn-submit:disabled{opacity:.6;cursor:not-allowed}
+.error-box{background:var(--red-pale);color:var(--red);border:1px solid #f5c6c0;border-radius:8px;padding:12px 14px;font-size:13px;margin-bottom:16px;display:none}
+.success-screen{display:none;text-align:center;padding:50px 24px}
+.success-icon{font-size:60px;margin-bottom:16px}
+.success-screen h2{font-family:'Playfair Display',serif;font-size:24px;color:var(--forest);margin-bottom:10px}
+.success-screen p{font-size:14px;color:var(--slate);line-height:1.7;margin-bottom:6px;max-width:420px;margin-left:auto;margin-right:auto}
+.skip-note{text-align:center;font-size:12.5px;color:var(--slate-light);margin-top:14px}
+.skip-note a{color:var(--forest-mid);font-weight:600;text-decoration:none}
+.member-result{background:var(--green-pale);border:1px solid rgba(39,174,96,0.3);border-radius:10px;padding:14px;margin-top:14px;font-size:13.5px;display:none}
+.member-result.error{background:var(--red-pale);border-color:#f5c6c0;color:var(--red)}
+</style>
+</head>
+<body>
 
-create table if not exists pending_payments (
-  id            uuid primary key default gen_random_uuid(),
-  member_id     text references members(id) on delete cascade,
-  member_name   text,
-  member_phone  text,
-  amount        numeric(10,2) not null default 600,
-  mpesa_code    text not null,
-  mpesa_phone   text,
-  payment_date  date not null,
-  status        text default 'Pending' check (status in ('Pending','Approved','Rejected')),
-  reviewed_by   text,
-  reviewed_at   timestamptz,
-  rejection_reason text,
-  created_at    timestamptz default now()
-);
+<div class="top-bar">
+  <div class="logo">
+    <div class="logo-icon">KMC</div>
+    <div class="logo-text">
+      <strong>Kenya Mennonite Church</strong>
+      <span>Subscription Payment</span>
+    </div>
+  </div>
+  <a href="register-public.html" style="color:rgba(255,255,255,0.6);font-size:13px;text-decoration:none">← Register</a>
+</div>
 
-alter table pending_payments enable row level security;
+<div class="hero">
+  <h1>Pay Your Annual Subscription</h1>
+  <p>KES 600 per year per baptized member. Pay via M-Pesa and submit your confirmation code below — your church administrator will verify and update your record.</p>
+</div>
 
--- Public can insert (members submitting their M-Pesa code)
-create policy "Public insert pending payments"
-  on pending_payments for insert
-  with check (true);
+<!-- SUCCESS SCREEN -->
+<div class="success-screen" id="success-screen">
+  <div class="success-icon">✅</div>
+  <h2>Submission Received!</h2>
+  <p>Thank you! Your M-Pesa payment details have been submitted for verification. Your church administrator will confirm it shortly and update your subscription status.</p>
+  <p style="font-weight:600;color:var(--forest)">You can check your subscription status anytime by contacting your church office.</p>
+  <a href="register-public.html" style="display:inline-block;margin-top:16px;color:var(--forest-mid);font-weight:600;text-decoration:none">← Back to Home</a>
+</div>
 
--- Authenticated admins can do everything
-create policy "Admins manage pending payments"
-  on pending_payments for all
-  to authenticated
-  using (true)
-  with check (true);
+<div class="wrap" id="main-wrap">
 
--- Public can read their own (optional, for status check) - kept open for simplicity
-create policy "Public read pending payments"
-  on pending_payments for select
-  using (true);
+  <div class="card">
+    <div class="card-title">📱 How to Pay via M-Pesa</div>
+    <div class="steps-list">
+      <div class="step-item">
+        <div class="step-num">1</div>
+        <div class="step-text">Go to <strong>M-Pesa</strong> on your phone → <strong>Lipa na M-Pesa</strong> → <strong>Pay Bill</strong></div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">2</div>
+        <div class="step-text">Enter your <strong>Member Number below</strong> first — your church's Paybill details will appear automatically</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">3</div>
+        <div class="step-text">Enter amount: <strong>KES 600</strong> → enter your M-Pesa PIN → confirm</div>
+      </div>
+      <div class="step-item">
+        <div class="step-num">4</div>
+        <div class="step-text">You'll receive an SMS with a <strong>confirmation code</strong> (e.g. <code>QGH7XYZ123</code>) — enter it in the form below</div>
+      </div>
+    </div>
+    <div class="paybill-box" id="paybill-box" style="display:none">
+      <div style="font-size:12px;color:var(--slate-light);margin-bottom:10px">paying to</div>
+      <div style="font-weight:700;font-size:16px;color:var(--forest);margin-bottom:14px" id="paybill-church-name">—</div>
+      <div class="paybill-row">
+        <div>
+          <div class="label">Business Number (Paybill)</div>
+          <div class="value" id="paybill-number">—</div>
+        </div>
+        <div>
+          <div class="label">Account Number</div>
+          <div class="value" id="paybill-account">—</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:13px;color:var(--forest)">Amount: <strong>KES 600</strong></div>
+    </div>
+    <div id="paybill-not-set" style="display:none;background:var(--red-pale);border:1px solid #f5c6c0;border-radius:10px;padding:14px;text-align:center;margin:14px 0;font-size:13.5px;color:var(--red)">
+      ⚠️ Your church has not set up M-Pesa Paybill details yet. Please contact your church administrator.
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📝 Submit Your Payment Details</div>
+    <div class="error-box" id="err-box"></div>
+
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Your Member Number or Phone Number *</label>
+        <input type="text" id="p-member-search" placeholder="e.g. KMC-0001 or 07XXXXXXXX" oninput="lookupMember()">
+        <div class="member-result" id="member-result"></div>
+      </div>
+      <div class="form-group">
+        <label>Amount Paid (KES) *</label>
+        <input type="number" id="p-amount" value="600" min="1">
+      </div>
+      <div class="form-group">
+        <label>M-Pesa Phone Number *</label>
+        <input type="tel" id="p-mpesa-phone" placeholder="07XXXXXXXX">
+      </div>
+      <div class="form-group full">
+        <label>M-Pesa Confirmation Code *</label>
+        <input type="text" id="p-mpesa-code" placeholder="e.g. QGH7XYZ123" style="text-transform:uppercase">
+      </div>
+      <div class="form-group full">
+        <label>Date of Payment *</label>
+        <input type="date" id="p-date">
+      </div>
+    </div>
+
+    <button class="btn-submit" id="submit-btn" onclick="submitPayment()">✅ Submit for Verification</button>
+    <div class="skip-note">Don't want to pay now? <a href="register-public.html">Skip and register only →</a></div>
+  </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="kmc-config.js"></script>
+<script>
+let foundMember = null;
+
+document.getElementById('p-date').value = new Date().toISOString().split('T')[0];
+
+async function lookupMember() {
+  const q = document.getElementById('p-member-search').value.trim();
+  const resultEl = document.getElementById('member-result');
+  foundMember = null;
+  if (q.length < 3) { resultEl.style.display = 'none'; return; }
+
+  try {
+    let members = [];
+    if (/^KMC-/i.test(q)) {
+      const m = await DB.getMember(q.toUpperCase()).catch(()=>null);
+      if (m) members = [m];
+    } else {
+      // search by phone
+      members = await DB.getMembers({});
+      members = members.filter(m => (m.phone||'').includes(q));
+    }
+
+    if (members.length === 1) {
+      foundMember = members[0];
+      resultEl.className = 'member-result';
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `✅ Found: <strong>${foundMember.firstname} ${foundMember.lastname}</strong> — ${foundMember.church||'—'} (${foundMember.id})`;
+
+      // Find church paybill details
+      const churches = await DB.getChurches();
+      const church = churches.find(c => c.name === foundMember.church);
+
+      const paybillBox = document.getElementById('paybill-box');
+      const paybillNotSet = document.getElementById('paybill-not-set');
+
+      if (church && church.paybill_number) {
+        document.getElementById('paybill-church-name').textContent = church.paybill_name || church.name;
+        document.getElementById('paybill-number').textContent = church.paybill_number;
+        document.getElementById('paybill-account').textContent = church.account_number || 'KMC SUB';
+        paybillBox.style.display = 'block';
+        paybillNotSet.style.display = 'none';
+      } else {
+        paybillBox.style.display = 'none';
+        paybillNotSet.style.display = 'block';
+      }
+    } else if (members.length > 1) {
+      resultEl.className = 'member-result error';
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `⚠️ Multiple matches found. Please enter your exact Member Number (e.g. KMC-0001).`;
+    } else {
+      resultEl.className = 'member-result error';
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `❌ No member found. Check your Member Number or phone number.`;
+    }
+  } catch(e) {
+    resultEl.style.display = 'none';
+  }
+}
+
+function showErr(msg) { const e=document.getElementById('err-box'); e.textContent=msg; e.style.display='block'; }
+function hideErr() { document.getElementById('err-box').style.display='none'; }
+
+async function submitPayment() {
+  hideErr();
+  const amount = parseFloat(document.getElementById('p-amount').value);
+  const mpesaPhone = document.getElementById('p-mpesa-phone').value.trim();
+  const mpesaCode = document.getElementById('p-mpesa-code').value.trim().toUpperCase();
+  const date = document.getElementById('p-date').value;
+
+  if (!foundMember) { showErr('Please enter a valid Member Number or phone number to identify your record.'); return; }
+  if (!amount || amount <= 0) { showErr('Please enter a valid amount.'); return; }
+  if (!mpesaPhone || !/^0[0-9]{9}$/.test(mpesaPhone)) { showErr('Enter a valid M-Pesa phone number (07XXXXXXXX).'); return; }
+  if (!mpesaCode || mpesaCode.length < 6) { showErr('Please enter a valid M-Pesa confirmation code.'); return; }
+  if (!date) { showErr('Please select the payment date.'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  try {
+    await DB.submitPendingPayment({
+      member_id: foundMember.id,
+      member_name: `${foundMember.firstname} ${foundMember.lastname}`,
+      member_phone: foundMember.phone,
+      amount,
+      mpesa_code: mpesaCode,
+      mpesa_phone: mpesaPhone,
+      payment_date: date,
+      status: 'Pending'
+    });
+    document.getElementById('main-wrap').style.display = 'none';
+    document.getElementById('success-screen').style.display = 'block';
+  } catch(e) {
+    showErr('Submission failed: ' + (e.message || 'Please try again.'));
+    btn.disabled = false;
+    btn.textContent = '✅ Submit for Verification';
+  }
+}
+</script>
+</body>
+</html>
