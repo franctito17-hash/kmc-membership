@@ -677,7 +677,6 @@ function renderChurches() {
 function openChurchModal(editId = null) {
   document.getElementById('c-edit-id').value = editId || '';
   document.getElementById('church-modal-title').textContent = editId ? 'Edit Church' : 'Add Church';
-  // Populate diocese select
   document.getElementById('c-diocese').innerHTML = '<option value="">Select Diocese</option>' +
     allDioceses.map(d => `<option>${d.name}</option>`).join('');
   const c = editId ? allChurches.find(x=>x.id===editId) : null;
@@ -692,8 +691,11 @@ function openChurchModal(editId = null) {
     document.getElementById('c-address').value = c.address || '';
     document.getElementById('c-established').value = c.established || '';
     document.getElementById('c-notes').value = c.notes || '';
+    document.getElementById('c-paybill').value = c.paybill_number || '';
+    document.getElementById('c-account').value = c.account_number || '';
+    document.getElementById('c-paybill-name').value = c.paybill_name || '';
   } else {
-    ['c-name','c-pastor','c-county','c-subcounty','c-phone','c-email','c-address','c-established','c-notes'].forEach(id => { document.getElementById(id).value=''; });
+    ['c-name','c-pastor','c-county','c-subcounty','c-phone','c-email','c-address','c-established','c-notes','c-paybill','c-account','c-paybill-name'].forEach(id => { document.getElementById(id).value=''; });
     document.getElementById('c-diocese').value = '';
   }
   openModal('modal-church');
@@ -714,7 +716,10 @@ async function saveChurch() {
     email: document.getElementById('c-email').value.trim(),
     address: document.getElementById('c-address').value.trim(),
     established: document.getElementById('c-established').value || null,
-    notes: document.getElementById('c-notes').value.trim()
+    notes: document.getElementById('c-notes').value.trim(),
+    paybill_number: document.getElementById('c-paybill').value.trim(),
+    account_number: document.getElementById('c-account').value.trim(),
+    paybill_name: document.getElementById('c-paybill-name').value.trim()
   };
   if (editId) row.id = editId;
   try {
