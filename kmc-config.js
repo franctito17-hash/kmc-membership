@@ -51,7 +51,7 @@ const Auth = {
 const DB = {
   // DIOCESES
   async getDioceses() {
-    const { data, error } = await _sb.from('dioceses').select('*').order('sort_order', {ascending: true});
+    const { data, error } = await _sb.from('dioceses').select('*').order('name');
     if (error) throw error;
     return data || [];
   },
@@ -74,7 +74,7 @@ const DB = {
 
   // CHURCHES
   async getChurches(dioceseName = null) {
-    let q = _sb.from('churches').select('*').order('sort_order', {ascending: true});
+    let q = _sb.from('churches').select('*').order('name');
     if (dioceseName) q = q.eq('diocese', dioceseName);
     const { data, error } = await q;
     if (error) throw error;
@@ -151,45 +151,6 @@ const DB = {
     const newPaid = (member.paid_amount || 0) + row.amount;
     await _sb.from('members').update({ paid_amount: newPaid }).eq('id', row.member_id);
     return data;
-  },
-
-  // PENDING M-PESA PAYMENTS (public self-reported)
-  async submitPendingPayment(row) {
-    const { data, error } = await _sb.from('pending_payments').insert(row).select().single();
-    if (error) throw error;
-    return data;
-  },
-  async getPendingPayments(status = null) {
-    let q = _sb.from('pending_payments').select('*').order('created_at', { ascending: false });
-    if (status) q = q.eq('status', status);
-    const { data, error } = await q;
-    if (error) throw error;
-    return data || [];
-  },
-  async approvePendingPayment(pending, reviewerName) {
-    // 1. Create the real payment record
-    const now = new Date();
-    await DB.savePayment({
-      member_id: pending.member_id,
-      member_name: pending.member_name,
-      amount: pending.amount,
-      method: 'M-Pesa',
-      reference: pending.mpesa_code,
-      payment_date: pending.payment_date,
-      financial_year: String(now.getFullYear()),
-      recorded_by: reviewerName
-    });
-    // 2. Mark pending as approved
-    const { error } = await _sb.from('pending_payments')
-      .update({ status: 'Approved', reviewed_by: reviewerName, reviewed_at: now.toISOString() })
-      .eq('id', pending.id);
-    if (error) throw error;
-  },
-  async rejectPendingPayment(id, reviewerName, reason) {
-    const { error } = await _sb.from('pending_payments')
-      .update({ status: 'Rejected', reviewed_by: reviewerName, reviewed_at: new Date().toISOString(), rejection_reason: reason||'' })
-      .eq('id', id);
-    if (error) throw error;
   },
 
   // OFFERTORY
