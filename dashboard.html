@@ -131,21 +131,6 @@ textarea{resize:vertical;min-height:80px}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:rgba(26,58,42,0.2);border-radius:10px}
-
-/* Viewer role: read-only — hide all mutating action buttons */
-body.role-viewer .btn-primary,
-body.role-viewer .btn-danger,
-body.role-viewer .btn-gold,
-body.role-viewer .page-actions .btn,
-body.role-viewer .card-header .btn,
-body.role-viewer td .btn-sm:not(:first-child) {
-  display: none !important;
-}
-body.role-viewer .page-header-left .page-subtitle::after {
-  content: " (Read-only access)";
-  color: var(--slate-light);
-  font-style: italic;
-}
 @media(max-width:768px){.sidebar{display:none}.charts-row{grid-template-columns:1fr}.main-content{padding:20px}}
 </style>
 </head>
@@ -182,30 +167,29 @@ body.role-viewer .page-header-left .page-subtitle::after {
     <div class="nav-section">
       <div class="nav-section-label">Membership</div>
       <div class="nav-item" onclick="showPage('members')"><span class="icon">👥</span>Members</div>
-      <div class="nav-item" id="nav-register" onclick="showPage('register')"><span class="icon">➕</span>Register Member</div>
-      <div class="nav-item" id="nav-bulk" onclick="showPage('bulk')"><span class="icon">📤</span>Bulk Upload</div>
+      <div class="nav-item" onclick="showPage('register')"><span class="icon">➕</span>Register Member</div>
+      <div class="nav-item" onclick="showPage('bulk')"><span class="icon">📤</span>Bulk Upload</div>
     </div>
-    <div class="nav-section" id="section-structure">
+    <div class="nav-section">
       <div class="nav-section-label">Church Structure</div>
-      <div class="nav-item" id="nav-dioceses" onclick="showPage('dioceses')"><span class="icon">🏛️</span>Dioceses</div>
-      <div class="nav-item" id="nav-churches" onclick="showPage('churches')"><span class="icon">⛪</span>Churches</div>
+      <div class="nav-item" onclick="showPage('dioceses')"><span class="icon">🏛️</span>Dioceses</div>
+      <div class="nav-item" onclick="showPage('churches')"><span class="icon">⛪</span>Churches</div>
       <div class="nav-item" onclick="showPage('leadership')"><span class="icon">👑</span>Leadership</div>
     </div>
     <div class="nav-section">
       <div class="nav-section-label">Finance</div>
       <div class="nav-item" onclick="showPage('subscriptions')"><span class="icon">💰</span>Subscriptions</div>
-      <div class="nav-item" id="nav-payments" onclick="showPage('payments')"><span class="icon">🧾</span>Record Payment</div>
-      <div class="nav-item" id="nav-pending" onclick="showPage('pending')"><span class="icon">⏳</span>Pending Payments<span id="pending-badge" style="display:none;background:var(--red);color:#fff;border-radius:100px;font-size:10px;padding:2px 7px;margin-left:6px;font-weight:700"></span></div>
-      <div class="nav-item" id="nav-offertory" onclick="showPage('offertory')"><span class="icon">🙏</span>Offertory</div>
-      <div class="nav-item" id="nav-tithes" onclick="showPage('tithes')"><span class="icon">📿</span>Tithes</div>
+      <div class="nav-item" onclick="showPage('payments')"><span class="icon">🧾</span>Record Payment</div>
+      <div class="nav-item" onclick="showPage('offertory')"><span class="icon">🙏</span>Offertory</div>
+      <div class="nav-item" onclick="showPage('tithes')"><span class="icon">📿</span>Tithes</div>
     </div>
     <div class="nav-section">
       <div class="nav-section-label">Analytics</div>
       <div class="nav-item" onclick="showPage('reports')"><span class="icon">📊</span>Reports</div>
     </div>
-    <div class="nav-section" id="section-system">
+    <div class="nav-section">
       <div class="nav-section-label">System</div>
-      <div class="nav-item" id="nav-users" onclick="showPage('users')"><span class="icon">🔐</span>Users &amp; Roles</div>
+      <div class="nav-item" onclick="showPage('users')"><span class="icon">🔐</span>Users &amp; Roles</div>
     </div>
   </nav>
 
@@ -229,8 +213,6 @@ body.role-viewer .page-header-left .page-subtitle::after {
         <div class="stat-card"><div class="stat-label">Total Offertory</div><div class="stat-value" id="d-offertory" style="font-size:22px">—</div><div class="stat-sub">All services (KES)</div><div class="stat-icon">🙏</div></div>
         <div class="stat-card green"><div class="stat-label">Total Tithes</div><div class="stat-value" id="d-tithes" style="font-size:22px">—</div><div class="stat-sub">All records (KES)</div><div class="stat-icon">📿</div></div>
         <div class="stat-card blue"><div class="stat-label">Online Registrations</div><div class="stat-value" id="d-online">—</div><div class="stat-sub">Self-registered online</div><div class="stat-icon">🌐</div></div>
-        <div class="stat-card" style="border-top-color:var(--gold)"><div class="stat-label">Subscriptions</div><div class="stat-value" id="d-subs" style="font-size:22px">—</div><div class="stat-sub" id="d-subs-sub">Collected / Expected</div><div class="stat-icon">💰</div></div>
-        <div class="stat-card red"><div class="stat-label">Pending Verification</div><div class="stat-value" id="d-pending" style="cursor:pointer" onclick="showPage('pending')">—</div><div class="stat-sub">M-Pesa submissions awaiting review</div><div class="stat-icon">⏳</div></div>
       </div>
       <div class="charts-row">
         <div class="chart-card">
@@ -460,28 +442,6 @@ body.role-viewer .page-header-left .page-subtitle::after {
       </div>
     </div>
 
-    <!-- ======= PENDING PAYMENTS ======= -->
-    <div class="page" id="page-pending">
-      <div class="page-header">
-        <div class="page-header-left"><div class="page-title">Pending M-Pesa Payments</div><div class="page-subtitle">Subscription payments submitted by members for verification</div></div>
-      </div>
-      <div class="finance-banner">
-        <div class="fb-item"><div class="fb-value" id="pend-total">—</div><div class="fb-label">Pending</div></div>
-        <div class="fb-item"><div class="fb-value" id="pend-amount">—</div><div class="fb-label">Total Amount (KES)</div></div>
-        <div class="fb-item"><div class="fb-value" id="pend-approved">—</div><div class="fb-label">Approved Today</div></div>
-        <div class="fb-item"><div class="fb-value" id="pend-rejected">—</div><div class="fb-label">Rejected</div></div>
-      </div>
-      <div class="tabs">
-        <div class="tab active" onclick="pendingTab('Pending',this)">Pending</div>
-        <div class="tab" onclick="pendingTab('Approved',this)">Approved</div>
-        <div class="tab" onclick="pendingTab('Rejected',this)">Rejected</div>
-      </div>
-      <div class="card"><div style="overflow-x:auto"><table>
-        <thead><tr><th>Submitted</th><th>Member</th><th>Phone</th><th>Amount</th><th>M-Pesa Code</th><th>M-Pesa Phone</th><th>Payment Date</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody id="pending-tbody"><tr class="loading-row"><td colspan="9">Loading…</td></tr></tbody>
-      </table></div></div>
-    </div>
-
     <!-- ======= OFFERTORY ======= -->
     <div class="page" id="page-offertory">
       <div class="page-header">
@@ -659,10 +619,6 @@ body.role-viewer .page-header-left .page-subtitle::after {
       <div class="form-group"><label>Email</label><input type="email" id="c-email"></div>
       <div class="form-group"><label>Address</label><input type="text" id="c-address"></div>
       <div class="form-group"><label>Established</label><input type="date" id="c-established"></div>
-      <div class="form-section-title" style="grid-column:1/-1;font-family:'Playfair Display',serif;font-size:14px;font-weight:600;color:var(--forest);padding-top:8px;border-top:1px solid var(--border);margin-top:4px">📱 M-Pesa Paybill Details</div>
-      <div class="form-group"><label>Paybill Number</label><input type="text" id="c-paybill" placeholder="e.g. 522533"></div>
-      <div class="form-group"><label>Account Number</label><input type="text" id="c-account" placeholder="e.g. KMC SUB"></div>
-      <div class="form-group"><label>Paybill Name</label><input type="text" id="c-paybill-name" placeholder="e.g. Songhor KMC"></div>
       <div class="form-group full"><label>Notes</label><textarea id="c-notes" style="min-height:60px"></textarea></div>
     </div>
     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:20px">
@@ -756,25 +712,6 @@ body.role-viewer .page-header-left .page-subtitle::after {
   </div>
 </div>
 
-<!-- REJECT PENDING PAYMENT MODAL -->
-<div class="modal-overlay" id="modal-reject">
-  <div class="modal" style="max-width:440px">
-    <div class="modal-header">
-      <div class="modal-title">Reject Payment Submission</div>
-      <button class="modal-close" onclick="closeModal('modal-reject')">✕</button>
-    </div>
-    <input type="hidden" id="reject-pending-id">
-    <div class="form-group">
-      <label>Reason for rejection</label>
-      <textarea id="reject-reason" placeholder="e.g. M-Pesa code not found in statement, wrong amount, duplicate submission..." style="min-height:90px"></textarea>
-    </div>
-    <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px">
-      <button class="btn btn-outline" onclick="closeModal('modal-reject')">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmRejectPending()">🚫 Reject</button>
-    </div>
-  </div>
-</div>
-
 <!-- ADMIN USER MODAL -->
 <div class="modal-overlay" id="modal-user">
   <div class="modal" style="max-width:520px">
@@ -786,7 +723,6 @@ body.role-viewer .page-header-left .page-subtitle::after {
     <div class="form-grid">
       <div class="form-group"><label>Full Name *</label><input type="text" id="u-name"></div>
       <div class="form-group"><label>Email *</label><input type="email" id="u-email"></div>
-      <div class="form-group" id="u-password-group"><label>Temporary Password *</label><input type="text" id="u-password" placeholder="e.g. Kmc@2026!"></div>
       <div class="form-group"><label>Role *</label>
         <select id="u-role" onchange="toggleUserScope()">
           <option value="viewer">Viewer</option>
@@ -800,8 +736,8 @@ body.role-viewer .page-header-left .page-subtitle::after {
       <div class="form-group" id="u-diocese-group"><label>Diocese Scope</label><select id="u-diocese"><option value="">All (national)</option></select></div>
       <div class="form-group" id="u-church-group"><label>Church Scope</label><select id="u-church"><option value="">All in diocese</option></select></div>
     </div>
-    <div style="background:var(--gold-pale);border-radius:8px;padding:12px;margin-top:16px;font-size:12.5px;color:var(--slate)" id="u-help-text">
-      💡 This creates both the <strong>login account</strong> and the <strong>admin profile</strong> automatically. Share the email + temporary password with the new admin — they should change it after first login.
+    <div style="background:var(--gold-pale);border-radius:8px;padding:12px;margin-top:16px;font-size:12.5px;color:var(--slate)">
+      💡 After saving, create the user's login in <strong>Supabase → Authentication → Users</strong>, then link the <strong>auth_id</strong> to this record.
     </div>
     <div style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px">
       <button class="btn btn-outline" onclick="closeModal('modal-user')">Cancel</button>
@@ -830,6 +766,6 @@ body.role-viewer .page-header-left .page-subtitle::after {
 </div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="kmc-config.js"></script>
-<script src="dashboard.js?v=5"></script>
+<script src="dashboard.js?v=4"></script>
 </body>
 </html>
