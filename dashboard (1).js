@@ -15,46 +15,21 @@ let pendingTabFilter = 'Pending';
 
 // ── INIT ──────────────────────────────────────────────────────
 async function init() {
-  // Check auth session
   const session = await Auth.getSession();
-  if (!session) {
-    window.location.href = 'login.html';
-    return;
-  }
-
+  if (!session) { window.location.href = 'login.html'; return; }
   const user = session.user;
-
-  // Try to load admin profile — don't block if it fails
-  try {
-    profile = await Auth.getAdminProfile(user.id);
-  } catch(e) {
-    console.warn('Profile load failed, using fallback:', e);
-  }
-
-  // Fallback profile if DB lookup fails
+  try { profile = await Auth.getAdminProfile(user.id); } catch(e) { console.warn(e); }
   if (!profile) {
-    profile = {
-      full_name: user.email.split('@')[0],
-      email: user.email,
-      role: 'super_admin',
-      is_active: true
-    };
+    profile = { full_name: user.email.split('@')[0], email: user.email, role: 'super_admin', is_active: true };
   }
-
   sessionStorage.setItem('kmc_profile', JSON.stringify(profile));
-
-  // Set header
   document.getElementById('hdr-name').textContent = profile.full_name;
   document.getElementById('hdr-role').textContent = formatRole(profile.role);
   document.getElementById('hdr-avatar').textContent = profile.full_name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-
   applyRoleRestrictions();
-
-  // Load all data
   await Promise.all([loadDioceses(), loadChurches()]);
   await Promise.all([loadMembers(), loadPayments(), loadOffertory(), loadTithes()]);
   await loadPendingPayments();
-
   renderDashboard();
   document.getElementById('pay-date').value = new Date().toISOString().split('T')[0];
 }
@@ -64,73 +39,36 @@ function formatRole(r) {
   return map[r] || r;
 }
 
-// ── ROLE-BASED ACCESS CONTROL ───────────────────────────────────
-function canEdit() {
-  return profile.role !== 'viewer';
-}
-function isSuperAdmin() {
-  return profile.role === 'super_admin';
-}
-function isDioceseAdmin() {
-  return profile.role === 'diocese_admin';
-}
-function isChurchAdmin() {
-  return profile.role === 'church_admin';
-}
-function isFinanceOfficer() {
-  return profile.role === 'finance_officer';
-}
+// ── ROLE-BASED ACCESS CONTROL ──────────────────────────────────
+function canEdit() { return profile.role !== 'viewer'; }
+function isSuperAdmin() { return profile.role === 'super_admin'; }
 
-function hideNav(id) {
-  const el = document.getElementById(id);
-  if (el) el.style.display = 'none';
-}
+function hideNav(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
 
 function applyRoleRestrictions() {
   const role = profile.role;
-
-  // ── Users & Roles: Super Admin only ──────────────────────────
-  if (role !== 'super_admin') {
-    hideNav('section-system');
-  }
-
-  // ── Church Structure (Dioceses/Churches): hide for church_admin & below ──
+  if (role !== 'super_admin') hideNav('section-system');
   if (role === 'church_admin' || role === 'finance_officer' || role === 'viewer') {
     hideNav('section-structure');
   } else if (role === 'diocese_admin') {
-    // Diocese admin can see churches in their diocese but not the Dioceses list
     hideNav('nav-dioceses');
   }
-
-  // ── Register Member / Bulk Upload: not for finance_officer or viewer ──
   if (role === 'finance_officer' || role === 'viewer') {
     hideNav('nav-register');
     hideNav('nav-bulk');
   }
-
-  // ── Record Payment / Offertory / Tithes: not for viewer ──
   if (role === 'viewer') {
     hideNav('nav-payments');
     hideNav('nav-pending');
     hideNav('nav-offertory');
     hideNav('nav-tithes');
-  }
-
-  // ── Viewer: hide all action buttons globally via CSS class on body ──
-  if (role === 'viewer') {
     document.body.classList.add('role-viewer');
   }
-
-  // ── Finance Officer: members view-only (handled in renderMembers via canEdit) ──
 }
 
-async function logout() {
-  await Auth.signOut();
-  sessionStorage.clear();
-  window.location.href = 'login.html';
-}
+async function logout() { await Auth.signOut(); sessionStorage.clear(); window.location.href = 'login.html'; }
 
-// ── LOAD DATA ─────────────────────────────────────────────────
+// ── LOAD DATA ──────────────────────────────────────────────────
 async function loadDioceses() {
   try { allDioceses = await DB.getDioceses(); } catch(e) { console.error(e); }
   populateDioceseSelects();
@@ -138,11 +76,8 @@ async function loadDioceses() {
 async function loadChurches() {
   try {
     allChurches = await DB.getChurches();
-    if (profile.role === 'diocese_admin' && profile.diocese) {
-      allChurches = allChurches.filter(c => c.diocese === profile.diocese);
-    } else if (profile.role === 'church_admin' && profile.church) {
-      allChurches = allChurches.filter(c => c.name === profile.church);
-    }
+    if (profile.role === 'diocese_admin' && profile.diocese) allChurches = allChurches.filter(c => c.diocese === profile.diocese);
+    else if (profile.role === 'church_admin' && profile.church) allChurches = allChurches.filter(c => c.name === profile.church);
   } catch(e) { console.error(e); }
   populateChurchSelects();
 }
@@ -156,18 +91,10 @@ async function loadMembers() {
 }
 async function loadPayments() {
   try {
-    const filters = {};
-    if (profile.role === 'diocese_admin' && profile.diocese) {
-      // payments don't store diocese directly; filter client-side after fetch
-      allPayments = await DB.getPayments();
+    allPayments = await DB.getPayments();
+    if (profile.role !== 'super_admin') {
       const memberIds = new Set(allMembers.map(m=>m.id));
       allPayments = allPayments.filter(p => memberIds.has(p.member_id));
-    } else if (profile.role === 'church_admin' && profile.church) {
-      allPayments = await DB.getPayments();
-      const memberIds = new Set(allMembers.map(m=>m.id));
-      allPayments = allPayments.filter(p => memberIds.has(p.member_id));
-    } else {
-      allPayments = await DB.getPayments();
     }
   } catch(e) { console.error(e); }
 }
@@ -187,10 +114,21 @@ async function loadTithes() {
     allTithes = await DB.getTithes(filters);
   } catch(e) { console.error(e); }
 }
+async function loadPendingPayments() {
+  try {
+    allPendingPayments = await DB.getPendingPayments();
+    if (profile.role !== 'super_admin') {
+      const memberIds = new Set(allMembers.map(m=>m.id));
+      allPendingPayments = allPendingPayments.filter(p => memberIds.has(p.member_id));
+    }
+    const pendingCount = allPendingPayments.filter(p=>p.status==='Pending').length;
+    const badge = document.getElementById('pending-badge');
+    if (badge) { if (pendingCount > 0) { badge.textContent = pendingCount; badge.style.display='inline-block'; } else badge.style.display='none'; }
+  } catch(e) { console.error(e); }
+}
 
-// ── NAVIGATION ────────────────────────────────────────────────
+// ── NAVIGATION ─────────────────────────────────────────────────
 function showPage(id) {
-  // Guard: block access to restricted pages based on role
   const restricted = {
     users: ['super_admin'],
     dioceses: ['super_admin'],
@@ -203,35 +141,31 @@ function showPage(id) {
     tithes: ['super_admin','diocese_admin','church_admin','finance_officer']
   };
   if (restricted[id] && !restricted[id].includes(profile.role)) {
-    toast("You don't have permission to access this page.", 'error');
-    return;
+    toast("You don't have permission to access this page.", 'error'); return;
   }
-
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('page-' + id).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => {
     if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + id + "'")) n.classList.add('active');
   });
-
-  // Lazy render
   const renders = {
     members: renderMembers, dioceses: renderDioceses, churches: renderChurches,
     leadership: renderLeadership, subscriptions: renderSubscriptions,
-    offertory: renderOffertory, tithes: renderTithes, reports: () => reportTab('membership', document.querySelector('.tab')),
+    offertory: renderOffertory, tithes: renderTithes,
+    reports: () => reportTab('membership', document.querySelector('#page-reports .tab')),
     users: renderUsers, pending: renderPendingPayments
   };
   if (renders[id]) renders[id]();
 }
 
-// ── DASHBOARD ─────────────────────────────────────────────────
+// ── DASHBOARD ──────────────────────────────────────────────────
 function renderDashboard() {
   const baptized = allMembers.filter(m => m.baptized === 'Yes');
   const leaders = allMembers.filter(m => m.leadership && m.leadership !== '');
   const offTotal = allOffertory.reduce((s,o) => s + (o.total_amount||0), 0);
   const titheTotal = allTithes.reduce((s,t) => s + (t.amount||0), 0);
   const online = allMembers.filter(m => m.registration_source === 'online');
-
   setEl('d-total', allMembers.length);
   setEl('d-baptized', baptized.length);
   setEl('d-churches', allChurches.length);
@@ -240,43 +174,32 @@ function renderDashboard() {
   setEl('d-offertory', 'KES ' + fmt(offTotal));
   setEl('d-tithes', 'KES ' + fmt(titheTotal));
   setEl('d-online', online.length);
-
-  // Subscription stats
   const subExpected = baptized.length * 600;
   const subCollected = baptized.reduce((s,m) => s + (m.paid_amount||0), 0);
   setEl('d-subs', 'KES ' + fmt(subCollected));
   setEl('d-subs-sub', `of KES ${fmt(subExpected)} expected`);
-
-  // Pending payments
   const pendingCount = allPendingPayments.filter(p=>p.status==='Pending').length;
   setEl('d-pending', pendingCount);
 
-  // Gender chart
   const male = allMembers.filter(m => m.gender === 'Male').length;
   const female = allMembers.filter(m => m.gender === 'Female').length;
   const total = allMembers.length || 1;
   const malePct = Math.round(male/total*100);
-  document.getElementById('dash-gender-chart').innerHTML = `
-    <div class="donut-wrap">
-      <div class="donut" style="background:conic-gradient(var(--blue) 0% ${malePct}%,#8e44ad ${malePct}% 100%)"></div>
-      <div class="donut-legend">
-        <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Male: ${male}</div>
-        <div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div>Female: ${female}</div>
-      </div>
-    </div>`;
+  const genderEl = document.getElementById('dash-gender-chart');
+  if (genderEl) genderEl.innerHTML = `<div class="donut-wrap"><div class="donut" style="background:conic-gradient(var(--blue) 0% ${malePct}%,#8e44ad ${malePct}% 100%)"></div><div class="donut-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Male: ${male}</div><div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div>Female: ${female}</div></div></div>`;
 
-  // Diocese chart
   const dNames = allDioceses.map(d=>d.name);
   const maxD = Math.max(...dNames.map(d => allMembers.filter(m=>m.diocese===d).length), 1);
-  document.getElementById('dash-diocese-chart').innerHTML = dNames.map((d,i) => {
+  const dioceseEl = document.getElementById('dash-diocese-chart');
+  if (dioceseEl) dioceseEl.innerHTML = dNames.map((d,i) => {
     const cnt = allMembers.filter(m => m.diocese === d).length;
     const colors = ['green','blue','gold','orange','red'];
     return `<div class="bar-row"><div class="bar-label">${d.replace(' Diocese','')}</div><div class="bar-wrap"><div class="bar-fill ${colors[i%5]}" style="width:${Math.round(cnt/maxD*100)}%">${cnt}</div></div></div>`;
   }).join('');
 
-  // Recent registrations
   const recent = [...allMembers].sort((a,b) => new Date(b.created_at)-new Date(a.created_at)).slice(0,10);
-  document.getElementById('dash-recent-tbody').innerHTML = recent.length ? recent.map(m => `
+  const recentEl = document.getElementById('dash-recent-tbody');
+  if (recentEl) recentEl.innerHTML = recent.length ? recent.map(m => `
     <tr>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${m.id}</span></td>
       <td><strong>${m.firstname} ${m.lastname}</strong></td>
@@ -287,14 +210,13 @@ function renderDashboard() {
     </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--slate-light)">No members yet</td></tr>';
 }
 
-// ── MEMBERS ───────────────────────────────────────────────────
+// ── MEMBERS ────────────────────────────────────────────────────
 function renderMembers() {
   filterMembers();
-  // Populate filter selects
   const dSel = document.getElementById('members-filter-diocese');
-  dSel.innerHTML = '<option value="">All Dioceses</option>' + allDioceses.map(d=>`<option>${d.name}</option>`).join('');
+  if (dSel) dSel.innerHTML = '<option value="">All Dioceses</option>' + allDioceses.map(d=>`<option>${d.name}</option>`).join('');
   const cSel = document.getElementById('members-filter-church');
-  cSel.innerHTML = '<option value="">All Churches</option>' + allChurches.map(c=>`<option>${c.name}</option>`).join('');
+  if (cSel) cSel.innerHTML = '<option value="">All Churches</option>' + allChurches.map(c=>`<option>${c.name}</option>`).join('');
 }
 
 function filterMembers() {
@@ -302,7 +224,6 @@ function filterMembers() {
   const diocese = document.getElementById('members-filter-diocese').value;
   const church = document.getElementById('members-filter-church').value;
   const status = document.getElementById('members-filter-status').value;
-
   let filtered = allMembers.filter(m => {
     if (diocese && m.diocese !== diocese) return false;
     if (church && m.church !== church) return false;
@@ -313,9 +234,10 @@ function filterMembers() {
     }
     return true;
   });
-
   setEl('members-count-label', `Members (${filtered.length})`);
-  document.getElementById('members-tbody').innerHTML = filtered.length ? filtered.map(m => {
+  const tbody = document.getElementById('members-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = filtered.length ? filtered.map(m => {
     const sub = getSubStatus(m);
     return `<tr>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${m.id}</span></td>
@@ -379,7 +301,6 @@ function editMember(id) {
   editingMemberId = id;
   document.getElementById('register-page-title').textContent = 'Edit Member — ' + m.id;
   document.getElementById('save-member-btn').textContent = '💾 Update Member';
-
   const fields = {
     'f-firstname': m.firstname, 'f-middlename': m.middlename, 'f-lastname': m.lastname,
     'f-gender': m.gender, 'f-dob': m.dob, 'f-idno': m.id_number,
@@ -396,10 +317,7 @@ function editMember(id) {
     if (el) el.value = val || '';
   }
   filterChurchSelect('f-diocese', 'f-church');
-  setTimeout(() => {
-    const cEl = document.getElementById('f-church');
-    if (cEl) cEl.value = m.church || '';
-  }, 50);
+  setTimeout(() => { const cEl = document.getElementById('f-church'); if (cEl) cEl.value = m.church || ''; }, 50);
   showPage('register');
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -412,15 +330,10 @@ async function saveMember() {
   const diocese = document.getElementById('f-diocese').value;
   const church = document.getElementById('f-church').value;
   const gender = document.getElementById('f-gender').value;
-
   if (!fn || !ln || !phone || !diocese || !church || !gender) {
-    toast('Please fill in all required fields (First Name, Last Name, Phone, Diocese, Church, Gender).', 'error');
-    return;
+    toast('Please fill in all required fields.', 'error'); return;
   }
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Saving…';
-
+  btn.disabled = true; btn.textContent = '⏳ Saving…';
   const row = {
     firstname: fn, middlename: document.getElementById('f-middlename').value.trim(),
     lastname: ln, gender,
@@ -445,19 +358,14 @@ async function saveMember() {
     registration_source: editingMemberId ? undefined : 'admin'
   };
   if (editingMemberId) row.id = editingMemberId;
-
   try {
     await DB.saveMember(row);
-    toast(editingMemberId ? 'Member updated successfully!' : 'Member registered successfully!', 'success');
+    toast(editingMemberId ? 'Member updated!' : 'Member registered!', 'success');
     await loadMembers();
     clearMemberForm();
     showPage('members');
-  } catch(e) {
-    toast('Error: ' + (e.message || 'Save failed'), 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = editingMemberId ? '💾 Update Member' : '💾 Save Member';
-  }
+  } catch(e) { toast('Error: ' + (e.message || 'Save failed'), 'error'); }
+  finally { btn.disabled = false; btn.textContent = editingMemberId ? '💾 Update Member' : '💾 Save Member'; }
 }
 
 function clearMemberForm() {
@@ -476,8 +384,7 @@ async function deleteMember(id) {
     await DB.deleteMember(id);
     allMembers = allMembers.filter(m => m.id !== id);
     toast('Member deleted.', 'success');
-    filterMembers();
-    renderDashboard();
+    filterMembers(); renderDashboard();
   } catch(e) { toast('Delete failed: ' + e.message, 'error'); }
 }
 
@@ -488,10 +395,10 @@ function exportMembersCSV() {
   toast('Members exported to CSV');
 }
 
-// ── BULK UPLOAD ───────────────────────────────────────────────
+// ── BULK UPLOAD ────────────────────────────────────────────────
 function downloadBulkTemplate() {
   const headers = ['firstname','middlename','lastname','gender','dob','phone','email','county','diocese','church','ministry','joined','baptized','leadership','status','occupation','marital'];
-  const sample = ['John','Kamau','Mwangi','Male','1985-04-12','0722001001','john@gmail.com','Nairobi','Nairobi Diocese','Nairobi Central KMC','Men Fellowship','2010-01-01','Yes','Deacon','Active','Teacher','Married'];
+  const sample = ['John','Kamau','Mwangi','Male','1985-04-12','0722001001','john@gmail.com','Nairobi','Nairobi Diocese','Eastleigh Fellowship Centre','Men Fellowship','2010-01-01','Yes','','Active','Teacher','Married'];
   downloadCSV('KMC_BulkTemplate.csv', headers, [sample]);
   toast('Template downloaded');
 }
@@ -500,10 +407,7 @@ function handleBulkFile(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
-    const text = e.target.result;
-    parseBulkCSV(text);
-  };
+  reader.onload = e => parseBulkCSV(e.target.result);
   reader.readAsText(file);
 }
 
@@ -513,7 +417,6 @@ function parseBulkCSV(text) {
   const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g,'').toLowerCase());
   bulkRows = [];
   const errors = [];
-
   for (let i = 1; i < lines.length; i++) {
     const vals = parseCSVLine(lines[i]);
     if (vals.length < 3) continue;
@@ -530,52 +433,37 @@ function parseBulkCSV(text) {
       paid_amount: 0, registration_source: 'bulk'
     });
   }
-
   document.getElementById('bulk-info').style.display = 'block';
   document.getElementById('bulk-summary').textContent = `${bulkRows.length} valid rows ready for upload`;
-  
   if (errors.length) {
     const errEl = document.getElementById('bulk-errors');
     errEl.style.display = 'block';
-    errEl.innerHTML = '<strong>⚠️ Validation errors (these rows will be skipped):</strong><br>' + errors.join('<br>');
+    errEl.innerHTML = '<strong>⚠️ Validation errors:</strong><br>' + errors.join('<br>');
   }
-
-  // Preview
   document.getElementById('bulk-preview').innerHTML = `
     <table style="font-size:12.5px">
       <thead><tr><th>#</th><th>Name</th><th>Phone</th><th>Diocese</th><th>Church</th><th>Status</th></tr></thead>
-      <tbody>${bulkRows.slice(0,20).map((r,i) => `
-        <tr><td>${i+1}</td><td>${r.firstname} ${r.lastname}</td><td>${r.phone}</td><td>${r.diocese||'—'}</td><td>${r.church||'—'}</td><td>${r.status}</td></tr>`).join('')}
-      </tbody>
+      <tbody>${bulkRows.slice(0,20).map((r,i) => `<tr><td>${i+1}</td><td>${r.firstname} ${r.lastname}</td><td>${r.phone}</td><td>${r.diocese||'—'}</td><td>${r.church||'—'}</td><td>${r.status}</td></tr>`).join('')}</tbody>
     </table>${bulkRows.length>20?`<div style="text-align:center;padding:10px;font-size:12px;color:var(--slate-light)">…and ${bulkRows.length-20} more rows</div>`:''}`;
 }
 
 function parseCSVLine(line) {
   const result = [], re = /("(?:[^"]|"")*"|[^,]*),?/g;
   let m;
-  while ((m = re.exec(line)) && m[0]) {
-    result.push(m[1].replace(/^"|"$/g,'').replace(/""/g,'"'));
-  }
+  while ((m = re.exec(line)) && m[0]) result.push(m[1].replace(/^"|"$/g,'').replace(/""/g,'"'));
   return result;
 }
 
 async function uploadBulk() {
   if (!bulkRows.length) return;
   const btn = document.getElementById('bulk-upload-btn');
-  btn.disabled = true;
-  btn.textContent = '⏳ Uploading…';
+  btn.disabled = true; btn.textContent = '⏳ Uploading…';
   try {
     const result = await DB.bulkInsertMembers(bulkRows);
-    toast(`✅ ${result.length} members uploaded successfully!`, 'success');
-    await loadMembers();
-    clearBulk();
-    renderDashboard();
-  } catch(e) {
-    toast('Upload failed: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '📤 Upload All';
-  }
+    toast(`✅ ${result.length} members uploaded!`, 'success');
+    await loadMembers(); clearBulk(); renderDashboard();
+  } catch(e) { toast('Upload failed: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = '📤 Upload All'; }
 }
 
 function clearBulk() {
@@ -585,25 +473,22 @@ function clearBulk() {
   document.getElementById('bulk-file').value = '';
 }
 
-// ── DIOCESES ──────────────────────────────────────────────────
+// ── DIOCESES ───────────────────────────────────────────────────
 function renderDioceses() {
-  document.getElementById('dioceses-tbody').innerHTML = allDioceses.length ? allDioceses.map(d => {
+  const tbody = document.getElementById('dioceses-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = allDioceses.length ? allDioceses.map(d => {
     const churchCount = allChurches.filter(c => c.diocese === d.name).length;
     const memberCount = allMembers.filter(m => m.diocese === d.name).length;
     return `<tr>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${d.id}</span></td>
       <td><strong>${d.name}</strong></td>
-      <td>${d.region||'—'}</td>
-      <td>${d.bishop||'—'}</td>
-      <td>${d.phone||'—'}</td>
-      <td>${d.email||'—'}</td>
-      <td><strong>${churchCount}</strong></td>
-      <td><strong>${memberCount}</strong></td>
+      <td>${d.region||'—'}</td><td>${d.bishop||'—'}</td><td>${d.phone||'—'}</td><td>${d.email||'—'}</td>
+      <td><strong>${churchCount}</strong></td><td><strong>${memberCount}</strong></td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-sm" onclick="openDioceseModal('${d.id}')">✏️ Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteDiocese('${d.id}')">🗑</button>
-      </td>
-    </tr>`;
+      </td></tr>`;
   }).join('') : '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--slate-light)">No dioceses yet</td></tr>';
 }
 
@@ -611,11 +496,14 @@ function openDioceseModal(editId = null) {
   document.getElementById('d-edit-id').value = editId || '';
   document.getElementById('diocese-modal-title').textContent = editId ? 'Edit Diocese' : 'Add Diocese';
   const d = editId ? allDioceses.find(x=>x.id===editId) : null;
-  ['d-name','d-region','d-bishop','d-phone','d-email','d-address','d-established','d-notes'].forEach(id => {
-    const key = id.replace('d-','').replace('-','_');
-    const el = document.getElementById(id);
-    if(el) el.value = d ? (d[key] || d[id.replace('d-','')] || '') : '';
-  });
+  document.getElementById('d-name').value = d ? d.name||'' : '';
+  document.getElementById('d-region').value = d ? d.region||'' : '';
+  document.getElementById('d-bishop').value = d ? d.bishop||'' : '';
+  document.getElementById('d-phone').value = d ? d.phone||'' : '';
+  document.getElementById('d-email').value = d ? d.email||'' : '';
+  document.getElementById('d-address').value = d ? d.address||'' : '';
+  document.getElementById('d-established').value = d ? d.established||'' : '';
+  document.getElementById('d-notes').value = d ? d.notes||'' : '';
   openModal('modal-diocese');
 }
 
@@ -636,66 +524,57 @@ async function saveDiocese() {
   try {
     await DB.saveDiocese(row);
     toast(editId ? 'Diocese updated!' : 'Diocese added!', 'success');
-    await loadDioceses();
-    closeModal('modal-diocese');
-    renderDioceses();
-    renderDashboard();
+    await loadDioceses(); closeModal('modal-diocese'); renderDioceses(); renderDashboard();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
 async function deleteDiocese(id) {
-  if (!confirm('Delete this diocese? Churches and members in this diocese will lose their diocese link.')) return;
+  if (!confirm('Delete this diocese?')) return;
   try {
     await DB.deleteDiocese(id);
     allDioceses = allDioceses.filter(d => d.id !== id);
-    toast('Diocese deleted.', 'success');
-    renderDioceses();
-    renderDashboard();
+    toast('Diocese deleted.', 'success'); renderDioceses(); renderDashboard();
   } catch(e) { toast('Delete failed: ' + e.message, 'error'); }
 }
 
-// ── CHURCHES ──────────────────────────────────────────────────
+// ── CHURCHES ───────────────────────────────────────────────────
 function renderChurches() {
-  document.getElementById('churches-tbody').innerHTML = allChurches.length ? allChurches.map(c => {
+  const tbody = document.getElementById('churches-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = allChurches.length ? allChurches.map(c => {
     const memberCount = allMembers.filter(m => m.church === c.name).length;
     return `<tr>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${c.id}</span></td>
-      <td><strong>${c.name}</strong></td>
-      <td>${c.diocese||'—'}</td>
-      <td>${c.pastor||'—'}</td>
-      <td>${c.county||'—'}</td>
-      <td>${c.phone||'—'}</td>
-      <td><strong>${memberCount}</strong></td>
+      <td><strong>${c.name}</strong></td><td>${c.diocese||'—'}</td><td>${c.pastor||'—'}</td>
+      <td>${c.county||'—'}</td><td>${c.phone||'—'}</td><td><strong>${memberCount}</strong></td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-sm" onclick="openChurchModal('${c.id}')">✏️ Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteChurch('${c.id}')">🗑</button>
-      </td>
-    </tr>`;
+      </td></tr>`;
   }).join('') : '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--slate-light)">No churches yet</td></tr>';
 }
 
 function openChurchModal(editId = null) {
   document.getElementById('c-edit-id').value = editId || '';
   document.getElementById('church-modal-title').textContent = editId ? 'Edit Church' : 'Add Church';
-  document.getElementById('c-diocese').innerHTML = '<option value="">Select Diocese</option>' +
-    allDioceses.map(d => `<option>${d.name}</option>`).join('');
+  document.getElementById('c-diocese').innerHTML = '<option value="">Select Diocese</option>' + allDioceses.map(d => `<option>${d.name}</option>`).join('');
   const c = editId ? allChurches.find(x=>x.id===editId) : null;
   if (c) {
-    document.getElementById('c-name').value = c.name || '';
-    document.getElementById('c-diocese').value = c.diocese || '';
-    document.getElementById('c-pastor').value = c.pastor || '';
-    document.getElementById('c-county').value = c.county || '';
-    document.getElementById('c-subcounty').value = c.sub_county || '';
-    document.getElementById('c-phone').value = c.phone || '';
-    document.getElementById('c-email').value = c.email || '';
-    document.getElementById('c-address').value = c.address || '';
-    document.getElementById('c-established').value = c.established || '';
-    document.getElementById('c-notes').value = c.notes || '';
-    document.getElementById('c-paybill').value = c.paybill_number || '';
-    document.getElementById('c-account').value = c.account_number || '';
-    document.getElementById('c-paybill-name').value = c.paybill_name || '';
+    document.getElementById('c-name').value = c.name||'';
+    document.getElementById('c-diocese').value = c.diocese||'';
+    document.getElementById('c-pastor').value = c.pastor||'';
+    document.getElementById('c-county').value = c.county||'';
+    document.getElementById('c-subcounty').value = c.sub_county||'';
+    document.getElementById('c-phone').value = c.phone||'';
+    document.getElementById('c-email').value = c.email||'';
+    document.getElementById('c-address').value = c.address||'';
+    document.getElementById('c-established').value = c.established||'';
+    document.getElementById('c-notes').value = c.notes||'';
+    document.getElementById('c-paybill').value = c.paybill_number||'';
+    document.getElementById('c-account').value = c.account_number||'';
+    document.getElementById('c-paybill-name').value = c.paybill_name||'';
   } else {
-    ['c-name','c-pastor','c-county','c-subcounty','c-phone','c-email','c-address','c-established','c-notes','c-paybill','c-account','c-paybill-name'].forEach(id => { document.getElementById(id).value=''; });
+    ['c-name','c-pastor','c-county','c-subcounty','c-phone','c-email','c-address','c-established','c-notes','c-paybill','c-account','c-paybill-name'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
     document.getElementById('c-diocese').value = '';
   }
   openModal('modal-church');
@@ -725,10 +604,7 @@ async function saveChurch() {
   try {
     await DB.saveChurch(row);
     toast(editId ? 'Church updated!' : 'Church added!', 'success');
-    await loadChurches();
-    closeModal('modal-church');
-    renderChurches();
-    renderDashboard();
+    await loadChurches(); closeModal('modal-church'); renderChurches(); renderDashboard();
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
@@ -737,30 +613,29 @@ async function deleteChurch(id) {
   try {
     await DB.deleteChurch(id);
     allChurches = allChurches.filter(c => c.id !== id);
-    toast('Church deleted.', 'success');
-    renderChurches();
+    toast('Church deleted.', 'success'); renderChurches();
   } catch(e) { toast('Delete failed: ' + e.message, 'error'); }
 }
 
-// ── LEADERSHIP ────────────────────────────────────────────────
+// ── LEADERSHIP ─────────────────────────────────────────────────
 function renderLeadership() {
   const leaders = allMembers.filter(m => m.leadership && m.leadership !== '');
   const count = r => leaders.filter(m => m.leadership === r).length;
   setEl('l-bishops', count('Bishop')); setEl('l-pastors', count('Pastor'));
   setEl('l-deacons', count('Deacon')); setEl('l-deaconesses', count('Deaconess'));
   setEl('l-elders', count('Elder'));
-  document.getElementById('leadership-tbody').innerHTML = leaders.length ? leaders.map(m => `
+  const tbody = document.getElementById('leadership-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = leaders.length ? leaders.map(m => `
     <tr>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${m.id}</span></td>
       <td><strong>${m.firstname} ${m.lastname}</strong></td>
       <td><span class="badge badge-active">${m.leadership}</span></td>
-      <td>${m.church||'—'}</td>
-      <td>${m.diocese||'—'}</td>
-      <td>${m.phone||'—'}</td>
+      <td>${m.church||'—'}</td><td>${m.diocese||'—'}</td><td>${m.phone||'—'}</td>
     </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:40px;color:var(--slate-light)">No leaders found</td></tr>';
 }
 
-// ── SUBSCRIPTIONS ─────────────────────────────────────────────
+// ── SUBSCRIPTIONS ──────────────────────────────────────────────
 let subFilter = 'all';
 function subTab(filter, el) {
   subFilter = filter;
@@ -775,27 +650,24 @@ function renderSubscriptions() {
   const collected = baptized.reduce((s,m) => s + (m.paid_amount||0), 0);
   const paidCount = baptized.filter(m => (m.paid_amount||0) >= 600).length;
   const unpaidCount = baptized.filter(m => !(m.paid_amount||0)).length;
-
   setEl('sub-expected', 'KES ' + fmt(expected));
   setEl('sub-collected', 'KES ' + fmt(collected));
   setEl('sub-outstanding', 'KES ' + fmt(expected-collected));
   setEl('sub-paid-count', paidCount);
   setEl('sub-unpaid-count', unpaidCount);
-
   let filtered = baptized;
-  if (subFilter === 'paid')    filtered = baptized.filter(m => (m.paid_amount||0)>=600);
+  if (subFilter === 'paid') filtered = baptized.filter(m => (m.paid_amount||0)>=600);
   if (subFilter === 'partial') filtered = baptized.filter(m => (m.paid_amount||0)>0 && (m.paid_amount||0)<600);
-  if (subFilter === 'unpaid')  filtered = baptized.filter(m => !(m.paid_amount||0));
-
-  document.getElementById('subscriptions-tbody').innerHTML = filtered.length ? filtered.map(m => {
+  if (subFilter === 'unpaid') filtered = baptized.filter(m => !(m.paid_amount||0));
+  const tbody = document.getElementById('subscriptions-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = filtered.length ? filtered.map(m => {
     const sub = getSubStatus(m);
     const bal = Math.max(0, 600 - (m.paid_amount||0));
     return `<tr>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${m.id}</span></td>
       <td><strong>${m.firstname} ${m.lastname}</strong></td>
-      <td>${m.church||'—'}</td>
-      <td>${m.diocese||'—'}</td>
-      <td>✝️ Yes</td>
+      <td>${m.church||'—'}</td><td>${m.diocese||'—'}</td><td>✝️ Yes</td>
       <td><strong>KES ${fmt(m.paid_amount)}</strong></td>
       <td>${bal>0?`<span style="color:var(--red)">KES ${fmt(bal)}</span>`:'<span style="color:var(--green)">✅ Paid</span>'}</td>
       <td><span class="badge ${sub.class}">${sub.label}</span></td>
@@ -808,14 +680,11 @@ function quickPay(memberId) {
   showPage('payments');
   setTimeout(() => {
     const m = allMembers.find(x=>x.id===memberId);
-    if(m) {
-      selectPaymentMember(m);
-      document.getElementById('pay-amount').value = Math.max(0, 600-(m.paid_amount||0));
-    }
+    if(m) { selectPaymentMember(m); document.getElementById('pay-amount').value = Math.max(0, 600-(m.paid_amount||0)); }
   }, 100);
 }
 
-// ── PAYMENTS ──────────────────────────────────────────────────
+// ── PAYMENTS ───────────────────────────────────────────────────
 function searchPaymentMember() {
   const q = document.getElementById('pay-search').value.toLowerCase();
   const suggestions = document.getElementById('pay-suggestions');
@@ -827,7 +696,7 @@ function searchPaymentMember() {
   if (!matches.length) { suggestions.style.display = 'none'; return; }
   suggestions.style.display = 'block';
   suggestions.innerHTML = matches.map(m => `
-    <div onclick="selectPaymentMember(${JSON.stringify(m).replace(/"/g,'&quot;')})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;hover:background:var(--cream)">
+    <div onclick="selectPaymentMember(${JSON.stringify(m).replace(/"/g,'&quot;')})" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px">
       <strong>${m.firstname} ${m.lastname}</strong> <span style="color:var(--slate-light);font-size:12px">${m.id}</span><br>
       <span style="font-size:12px;color:var(--slate-light)">${m.church||'—'} · ${m.phone||''}</span>
     </div>`).join('');
@@ -839,11 +708,9 @@ function selectPaymentMember(m) {
   document.getElementById('pay-suggestions').style.display = 'none';
   const sub = getSubStatus(m);
   const remaining = Math.max(0, 600 - (m.paid_amount||0));
-  document.getElementById('pay-member-info').style.display = 'block';
-  document.getElementById('pay-member-info').innerHTML = `
-    <strong>${m.firstname} ${m.lastname}</strong> · ${m.church||'—'}<br>
-    Paid: KES ${fmt(m.paid_amount)} · Balance: KES ${fmt(remaining)} · 
-    <span class="badge ${sub.class}">${sub.label}</span>`;
+  const infoEl = document.getElementById('pay-member-info');
+  infoEl.style.display = 'block';
+  infoEl.innerHTML = `<strong>${m.firstname} ${m.lastname}</strong> · ${m.church||'—'}<br>Paid: KES ${fmt(m.paid_amount)} · Balance: KES ${fmt(remaining)} · <span class="badge ${sub.class}">${sub.label}</span>`;
   if (!document.getElementById('pay-amount').value) document.getElementById('pay-amount').value = remaining;
 }
 
@@ -853,25 +720,18 @@ async function recordPayment() {
   if (!amount || amount <= 0) { toast('Enter a valid amount.', 'error'); return; }
   const m = allMembers.find(x => x.id === payingMemberId);
   if (!m) return;
-
   try {
     const payment = await DB.savePayment({
-      member_id: payingMemberId,
-      member_name: `${m.firstname} ${m.lastname}`,
-      amount,
-      method: document.getElementById('pay-method').value,
+      member_id: payingMemberId, member_name: `${m.firstname} ${m.lastname}`,
+      amount, method: document.getElementById('pay-method').value,
       payment_date: document.getElementById('pay-date').value,
       financial_year: document.getElementById('pay-year').value,
       reference: document.getElementById('pay-ref').value.trim(),
       recorded_by: profile.full_name
     });
-
-    // Update local
     const idx = allMembers.findIndex(x => x.id === payingMemberId);
     if (idx >= 0) allMembers[idx].paid_amount = (allMembers[idx].paid_amount||0) + amount;
     allPayments.unshift(payment);
-
-    // Show receipt
     document.getElementById('receipt-area').innerHTML = `
       <div class="receipt">
         <div class="receipt-header">
@@ -890,7 +750,6 @@ async function recordPayment() {
         <div class="receipt-total"><span>AMOUNT PAID</span><span>KES ${fmt(amount)}</span></div>
         <div style="text-align:center;margin-top:12px;font-size:11px;color:var(--slate-light)">Thank you for your faithful giving</div>
       </div>`;
-
     toast('Payment recorded! ✅', 'success');
     payingMemberId = null;
     document.getElementById('pay-search').value = '';
@@ -900,27 +759,7 @@ async function recordPayment() {
   } catch(e) { toast('Error: ' + e.message, 'error'); }
 }
 
-// ── PENDING M-PESA PAYMENTS ──────────────────────────────────────
-async function loadPendingPayments() {
-  try {
-    allPendingPayments = await DB.getPendingPayments();
-    // Scope to role
-    if (profile.role === 'diocese_admin' && profile.diocese) {
-      const memberIds = new Set(allMembers.map(m=>m.id));
-      allPendingPayments = allPendingPayments.filter(p => memberIds.has(p.member_id));
-    } else if (profile.role === 'church_admin' && profile.church) {
-      const memberIds = new Set(allMembers.map(m=>m.id));
-      allPendingPayments = allPendingPayments.filter(p => memberIds.has(p.member_id));
-    }
-    const pendingCount = allPendingPayments.filter(p=>p.status==='Pending').length;
-    const badge = document.getElementById('pending-badge');
-    if (badge) {
-      if (pendingCount > 0) { badge.textContent = pendingCount; badge.style.display='inline-block'; }
-      else badge.style.display='none';
-    }
-  } catch(e) { console.error(e); }
-}
-
+// ── PENDING M-PESA PAYMENTS ────────────────────────────────────
 function pendingTab(status, el) {
   pendingTabFilter = status;
   document.querySelectorAll('#page-pending .tab').forEach(t=>t.classList.remove('active'));
@@ -932,25 +771,21 @@ function renderPendingPayments() {
   const all = allPendingPayments;
   const pending = all.filter(p=>p.status==='Pending');
   const today = new Date().toISOString().split('T')[0];
-  const approvedToday = all.filter(p=>p.status==='Approved' && p.reviewed_at && p.reviewed_at.startsWith(today));
+  const approvedToday = all.filter(p=>p.status==='Approved'&&p.reviewed_at&&p.reviewed_at.startsWith(today));
   const rejected = all.filter(p=>p.status==='Rejected');
-
   setEl('pend-total', pending.length);
-  setEl('pend-amount', 'KES ' + fmt(pending.reduce((s,p)=>s+(p.amount||0),0)));
+  setEl('pend-amount', 'KES '+fmt(pending.reduce((s,p)=>s+(p.amount||0),0)));
   setEl('pend-approved', approvedToday.length);
   setEl('pend-rejected', rejected.length);
-
   const filtered = all.filter(p=>p.status===pendingTabFilter);
-
-  document.getElementById('pending-tbody').innerHTML = filtered.length ? filtered.map(p=>{
+  const tbody = document.getElementById('pending-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = filtered.length ? filtered.map(p=>{
     const statusClass = p.status==='Pending'?'badge-partial':p.status==='Approved'?'badge-paid':'badge-unpaid';
     let actions = '';
-    if (p.status === 'Pending') {
-      actions = `
-        <button class="btn btn-success btn-sm" onclick="approvePending('${p.id}')">✅ Approve</button>
-        <button class="btn btn-danger btn-sm" onclick="openRejectModal('${p.id}')">🚫 Reject</button>`;
-    } else if (p.status === 'Rejected' && p.rejection_reason) {
-      actions = `<span style="font-size:11.5px;color:var(--red)" title="${p.rejection_reason}">Reason: ${p.rejection_reason.slice(0,30)}${p.rejection_reason.length>30?'…':''}</span>`;
+    if (p.status==='Pending') {
+      actions = `<button class="btn btn-success btn-sm" onclick="approvePending('${p.id}')">✅ Approve</button>
+                 <button class="btn btn-danger btn-sm" onclick="openRejectModal('${p.id}')">🚫 Reject</button>`;
     } else {
       actions = `<span style="font-size:11.5px;color:var(--slate-light)">by ${p.reviewed_by||'—'}</span>`;
     }
@@ -971,18 +806,13 @@ function renderPendingPayments() {
 async function approvePending(id) {
   const p = allPendingPayments.find(x=>x.id===id);
   if (!p) return;
-  if (!confirm(`Approve KES ${fmt(p.amount)} payment from ${p.member_name}?\nThis will record it as a verified subscription payment.`)) return;
-
+  if (!confirm(`Approve KES ${fmt(p.amount)} from ${p.member_name}?`)) return;
   try {
     await DB.approvePendingPayment(p, profile.full_name);
     toast('Payment approved and recorded!', 'success');
-    // Update local member paid_amount
     const m = allMembers.find(x=>x.id===p.member_id);
     if (m) m.paid_amount = (m.paid_amount||0) + p.amount;
-    await loadPendingPayments();
-    await loadPayments();
-    renderPendingPayments();
-    renderDashboard();
+    await loadPendingPayments(); await loadPayments(); renderPendingPayments(); renderDashboard();
   } catch(e) { toast('Error: '+e.message, 'error'); }
 }
 
@@ -995,36 +825,34 @@ function openRejectModal(id) {
 async function confirmRejectPending() {
   const id = document.getElementById('reject-pending-id').value;
   const reason = document.getElementById('reject-reason').value.trim();
-  if (!reason) { toast('Please provide a reason for rejection.', 'error'); return; }
+  if (!reason) { toast('Please provide a reason.', 'error'); return; }
   try {
     await DB.rejectPendingPayment(id, profile.full_name, reason);
-    toast('Payment submission rejected.', 'success');
+    toast('Submission rejected.', 'success');
     closeModal('modal-reject');
-    await loadPendingPayments();
-    renderPendingPayments();
+    await loadPendingPayments(); renderPendingPayments();
   } catch(e) { toast('Error: '+e.message, 'error'); }
 }
 
-
+// ── OFFERTORY ──────────────────────────────────────────────────
 function renderOffertory() {
   const churchFilter = document.getElementById('off-filter-church').value;
   const typeFilter = document.getElementById('off-filter-type').value;
   const monthFilter = document.getElementById('off-filter-month').value;
-
   let data = allOffertory;
   if (churchFilter) data = data.filter(o => o.church_name === churchFilter);
-  if (typeFilter)   data = data.filter(o => o.service_type === typeFilter);
-  if (monthFilter)  data = data.filter(o => o.service_date && o.service_date.startsWith(monthFilter));
-
+  if (typeFilter) data = data.filter(o => o.service_type === typeFilter);
+  if (monthFilter) data = data.filter(o => o.service_date && o.service_date.startsWith(monthFilter));
   const totOff = data.reduce((s,o)=>s+(o.total_amount||0),0);
   const totTithe = data.reduce((s,o)=>s+(o.tithe_total||0),0);
   const totGrand = data.reduce((s,o)=>s+(o.grand_total||0),0);
-  setEl('off-total', 'KES ' + fmt(totOff));
-  setEl('off-tithe', 'KES ' + fmt(totTithe));
-  setEl('off-grand', 'KES ' + fmt(totGrand));
-  setEl('off-services', data.length);
-
-  document.getElementById('offertory-tbody').innerHTML = data.length ? data.map(o => `
+  setEl('off-total','KES '+fmt(totOff));
+  setEl('off-tithe','KES '+fmt(totTithe));
+  setEl('off-grand','KES '+fmt(totGrand));
+  setEl('off-services',data.length);
+  const tbody = document.getElementById('offertory-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = data.length ? data.map(o => `
     <tr>
       <td>${o.service_date||'—'}</td>
       <td><strong>${o.church_name}</strong></td>
@@ -1073,15 +901,15 @@ function openOffertoryModal(editId = null) {
 }
 
 function updateOffTotal() {
-  const cash = parseFloat(document.getElementById('off-cash').value)||0;
-  const mpesa = parseFloat(document.getElementById('off-mpesa').value)||0;
-  const cheque = parseFloat(document.getElementById('off-cheque').value)||0;
-  const tcash = parseFloat(document.getElementById('off-tithe-cash').value)||0;
-  const tmpesa = parseFloat(document.getElementById('off-tithe-mpesa').value)||0;
-  const offTotal = cash+mpesa+cheque, titheTotal = tcash+tmpesa;
-  document.getElementById('off-total-display').value = 'KES ' + fmt(offTotal);
-  document.getElementById('off-tithe-display').value = 'KES ' + fmt(titheTotal);
-  document.getElementById('off-grand-display').value = 'KES ' + fmt(offTotal+titheTotal);
+  const cash=parseFloat(document.getElementById('off-cash').value)||0;
+  const mpesa=parseFloat(document.getElementById('off-mpesa').value)||0;
+  const cheque=parseFloat(document.getElementById('off-cheque').value)||0;
+  const tcash=parseFloat(document.getElementById('off-tithe-cash').value)||0;
+  const tmpesa=parseFloat(document.getElementById('off-tithe-mpesa').value)||0;
+  const offTotal=cash+mpesa+cheque, titheTotal=tcash+tmpesa;
+  document.getElementById('off-total-display').value='KES '+fmt(offTotal);
+  document.getElementById('off-tithe-display').value='KES '+fmt(titheTotal);
+  document.getElementById('off-grand-display').value='KES '+fmt(offTotal+titheTotal);
 }
 
 async function saveOffertory() {
@@ -1091,11 +919,9 @@ async function saveOffertory() {
   if (!churchName || !serviceDate) { toast('Church and service date are required.', 'error'); return; }
   const churchObj = allChurches.find(c=>c.name===churchName);
   const editId = document.getElementById('off-edit-id').value;
-
   const row = {
     church_name: churchName, diocese: churchObj?.diocese||'',
-    service_date: serviceDate,
-    service_type: document.getElementById('off-type').value,
+    service_date: serviceDate, service_type: document.getElementById('off-type').value,
     service_description: document.getElementById('off-desc').value.trim(),
     attendance: parseInt(document.getElementById('off-attendance').value)||null,
     cash_amount: parseFloat(document.getElementById('off-cash').value)||0,
@@ -1107,15 +933,12 @@ async function saveOffertory() {
     recorded_by: profile.full_name
   };
   if (editId) row.id = editId;
-
   try {
     const saved = await DB.saveOffertory(row);
     if (editId) { allOffertory = allOffertory.map(o=>o.id===editId?saved:o); }
     else { allOffertory.unshift(saved); }
     toast('Offertory record saved!', 'success');
-    closeModal('modal-offertory');
-    renderOffertory();
-    renderDashboard();
+    closeModal('modal-offertory'); renderOffertory(); renderDashboard();
   } catch(e) { toast('Error: '+e.message, 'error'); }
 }
 
@@ -1124,21 +947,17 @@ async function deleteOffertory(id) {
   try {
     await DB.deleteOffertory(id);
     allOffertory = allOffertory.filter(o=>o.id!==id);
-    toast('Record deleted.', 'success');
-    renderOffertory();
-    renderDashboard();
+    toast('Record deleted.', 'success'); renderOffertory(); renderDashboard();
   } catch(e) { toast('Delete failed: '+e.message, 'error'); }
 }
 
-// ── TITHES ────────────────────────────────────────────────────
+// ── TITHES ─────────────────────────────────────────────────────
 function renderTithes() {
   const churchFilter = document.getElementById('tithe-filter-church').value;
   const monthFilter = document.getElementById('tithe-filter-month').value;
-
   let data = allTithes;
   if (churchFilter) data = data.filter(t=>t.church_name===churchFilter);
-  if (monthFilter)  data = data.filter(t=>t.tithe_date&&t.tithe_date.startsWith(monthFilter));
-
+  if (monthFilter) data = data.filter(t=>t.tithe_date&&t.tithe_date.startsWith(monthFilter));
   const totCash = data.filter(t=>t.method==='Cash').reduce((s,t)=>s+(t.amount||0),0);
   const totMpesa = data.filter(t=>t.method==='M-Pesa').reduce((s,t)=>s+(t.amount||0),0);
   const totAll = data.reduce((s,t)=>s+(t.amount||0),0);
@@ -1146,8 +965,9 @@ function renderTithes() {
   setEl('tithe-cash','KES '+fmt(totCash));
   setEl('tithe-mpesa','KES '+fmt(totMpesa));
   setEl('tithe-count',data.length);
-
-  document.getElementById('tithes-tbody').innerHTML = data.length ? data.map(t=>`
+  const tbody = document.getElementById('tithes-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = data.length ? data.map(t=>`
     <tr>
       <td>${t.tithe_date||'—'}</td>
       <td><strong>${t.church_name}</strong></td>
@@ -1157,18 +977,27 @@ function renderTithes() {
       <td>${t.method||'—'}</td>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${t.reference||'—'}</span></td>
       <td>${t.month_year||'—'}</td>
-    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--slate-light)">No tithe records yet</td></tr>';
+      <td><button class="btn btn-danger btn-sm" onclick="deleteTithe('${t.id}')">🗑</button></td>
+    </tr>`).join('') : '<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--slate-light)">No tithe records yet</td></tr>';
+}
+
+async function deleteTithe(id) {
+  if (!confirm('Delete this tithe record?')) return;
+  try {
+    const { error } = await _sb.from('tithes').delete().eq('id', id);
+    if (error) throw error;
+    allTithes = allTithes.filter(t=>t.id!==id);
+    toast('Tithe record deleted.', 'success'); renderTithes(); renderDashboard();
+  } catch(e) { toast('Delete failed: '+e.message, 'error'); }
 }
 
 function openTitheModal() {
   selectedTitheMemberId = null;
-  document.getElementById('t-church').innerHTML = '<option value="">Select Church</option>' +
-    allChurches.map(c=>`<option>${c.name}</option>`).join('');
+  document.getElementById('t-church').innerHTML = '<option value="">Select Church</option>' + allChurches.map(c=>`<option>${c.name}</option>`).join('');
   document.getElementById('t-date').value = new Date().toISOString().split('T')[0];
   const now = new Date();
   document.getElementById('t-monthyear').value = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  document.getElementById('t-member-search').value=''; document.getElementById('t-amount').value='';
-  document.getElementById('t-ref').value=''; document.getElementById('t-notes').value='';
+  ['t-member-search','t-amount','t-ref','t-notes'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('t-anon').checked=false;
   openModal('modal-tithe');
 }
@@ -1192,7 +1021,6 @@ function selectTitheMember(id) {
   const m = allMembers.find(x=>x.id===id);
   if(m) document.getElementById('t-member-search').value=`${m.firstname} ${m.lastname}`;
   document.getElementById('t-member-suggestions').style.display='none';
-  // Auto-fill church if empty
   if(m && m.church && !document.getElementById('t-church').value) document.getElementById('t-church').value=m.church;
 }
 
@@ -1205,43 +1033,40 @@ async function saveTithe() {
   const isAnon = document.getElementById('t-anon').checked;
   const mv = document.getElementById('t-monthyear').value;
   const monthYear = mv ? new Date(mv+'-01').toLocaleDateString('en-GB',{month:'long',year:'numeric'}) : '';
-
+  const m = selectedTitheMemberId ? allMembers.find(x=>x.id===selectedTitheMemberId) : null;
   const row = {
     church_name: church, diocese: churchObj?.diocese||'',
     member_id: isAnon ? null : (selectedTitheMemberId||null),
-    member_name: isAnon ? null : (selectedTitheMemberId ? allMembers.find(m=>m.id===selectedTitheMemberId)?.firstname+' '+allMembers.find(m=>m.id===selectedTitheMemberId)?.lastname : document.getElementById('t-member-search').value.trim()||null),
-    is_anonymous: isAnon,
-    amount, method: document.getElementById('t-method').value,
+    member_name: isAnon ? null : (m ? `${m.firstname} ${m.lastname}` : document.getElementById('t-member-search').value.trim()||null),
+    is_anonymous: isAnon, amount,
+    method: document.getElementById('t-method').value,
     reference: document.getElementById('t-ref').value.trim(),
     tithe_date: date, month_year: monthYear,
     notes: document.getElementById('t-notes').value.trim(),
     recorded_by: profile.full_name
   };
-
   try {
     const saved = await DB.saveTithe(row);
     allTithes.unshift(saved);
     toast('Tithe recorded!', 'success');
-    closeModal('modal-tithe');
-    renderTithes();
-    renderDashboard();
+    closeModal('modal-tithe'); renderTithes(); renderDashboard();
   } catch(e) { toast('Error: '+e.message, 'error'); }
 }
 
-// ── REPORTS ───────────────────────────────────────────────────
+// ── REPORTS ────────────────────────────────────────────────────
 function reportTab(tab, el) {
   ['membership','financial','church','diocese','offertory'].forEach(t=>{
-    const el=document.getElementById('rep-'+t); if(el) el.style.display='none';
+    const el2=document.getElementById('rep-'+t); if(el2) el2.style.display='none';
   });
   document.querySelectorAll('#page-reports .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
-  document.getElementById('rep-'+tab).style.display='block';
-
+  const repEl = document.getElementById('rep-'+tab);
+  if (repEl) repEl.style.display='block';
   if (tab==='membership') renderMembershipReport();
-  if (tab==='financial')  renderFinancialReport();
-  if (tab==='church')     renderChurchReport();
-  if (tab==='diocese')    renderDioceseReport();
-  if (tab==='offertory')  renderOffertoryReport();
+  if (tab==='financial') renderFinancialReport();
+  if (tab==='church') renderChurchReport();
+  if (tab==='diocese') renderDioceseReport();
+  if (tab==='offertory') renderOffertoryReport();
 }
 
 function renderMembershipReport() {
@@ -1251,11 +1076,13 @@ function renderMembershipReport() {
   setEl('rm-baptized',allMembers.filter(m=>m.baptized==='Yes').length);
   setEl('rm-active',allMembers.filter(m=>m.status==='Active').length);
   const t=total||1, mPct=Math.round(male/t*100);
-  document.getElementById('rep-gender-chart').innerHTML=`<div class="donut-wrap"><div class="donut" style="background:conic-gradient(var(--blue) 0% ${mPct}%,#8e44ad ${mPct}% 100%)"></div><div class="donut-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Male: ${male}</div><div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div>Female: ${female}</div></div></div>`;
+  const gEl=document.getElementById('rep-gender-chart');
+  if(gEl) gEl.innerHTML=`<div class="donut-wrap"><div class="donut" style="background:conic-gradient(var(--blue) 0% ${mPct}%,#8e44ad ${mPct}% 100%)"></div><div class="donut-legend"><div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Male: ${male}</div><div class="legend-item"><div class="legend-dot" style="background:#8e44ad"></div>Female: ${female}</div></div></div>`;
   const ministries=['Women Ministry','Youth Ministry','Men Fellowship','Sunday School','Teenager Ministry','Choir','Evangelism','Missions'];
   const maxM=Math.max(...ministries.map(m=>allMembers.filter(x=>x.ministry===m).length),1);
   const colors=['green','blue','gold','orange','red'];
-  document.getElementById('rep-ministry-chart').innerHTML=ministries.map((m,i)=>{
+  const mEl=document.getElementById('rep-ministry-chart');
+  if(mEl) mEl.innerHTML=ministries.map((m,i)=>{
     const cnt=allMembers.filter(x=>x.ministry===m).length;
     return`<div class="bar-row"><div class="bar-label" style="width:110px;font-size:11px;text-align:right">${m}</div><div class="bar-wrap"><div class="bar-fill ${colors[i%5]}" style="width:${Math.round(cnt/maxM*100)}%">${cnt}</div></div></div>`;
   }).join('');
@@ -1268,7 +1095,8 @@ function renderFinancialReport() {
   setEl('rf-collected','KES '+fmt(coll));
   setEl('rf-balance','KES '+fmt(exp-coll));
   setEl('rf-rate',(exp?Math.round(coll/exp*100):0)+'%');
-  document.getElementById('rf-payments-tbody').innerHTML=allPayments.length?allPayments.map(p=>`
+  const tbody=document.getElementById('rf-payments-tbody');
+  if(tbody) tbody.innerHTML=allPayments.length?allPayments.map(p=>`
     <tr>
       <td><span style="font-family:'DM Mono',monospace;font-size:12px">${p.receipt_no||'—'}</span></td>
       <td>${p.member_name||'—'}</td><td><strong>KES ${fmt(p.amount)}</strong></td>
@@ -1277,7 +1105,9 @@ function renderFinancialReport() {
 }
 
 function renderChurchReport() {
-  document.getElementById('rep-church-tbody').innerHTML = allChurches.length ? allChurches.map(c=>{
+  const tbody=document.getElementById('rep-church-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = allChurches.length ? allChurches.map(c=>{
     const ms=allMembers.filter(m=>m.church===c.name);
     const offTotal=allOffertory.filter(o=>o.church_name===c.name).reduce((s,o)=>s+(o.total_amount||0),0);
     const titheTotal=allTithes.filter(t=>t.church_name===c.name).reduce((s,t)=>s+(t.amount||0),0);
@@ -1291,7 +1121,9 @@ function renderChurchReport() {
 }
 
 function renderDioceseReport() {
-  document.getElementById('rep-diocese-tbody').innerHTML = allDioceses.length ? allDioceses.map(d=>{
+  const tbody=document.getElementById('rep-diocese-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = allDioceses.length ? allDioceses.map(d=>{
     const churches=allChurches.filter(c=>c.diocese===d.name).length;
     const ms=allMembers.filter(m=>m.diocese===d.name);
     const rev=ms.reduce((s,m)=>s+(m.paid_amount||0),0);
@@ -1303,16 +1135,19 @@ function renderDioceseReport() {
 }
 
 function renderOffertoryReport() {
-  document.getElementById('rep-offertory-tbody').innerHTML = allChurches.length ? (allChurches.map(c=>{
+  const tbody=document.getElementById('rep-offertory-tbody');
+  if(!tbody) return;
+  const rows = allChurches.map(c=>{
     const ofs=allOffertory.filter(o=>o.church_name===c.name);
+    if (!ofs.length) return '';
     const offTotal=ofs.reduce((s,o)=>s+(o.total_amount||0),0);
     const titheTotal=ofs.reduce((s,o)=>s+(o.tithe_total||0),0);
     const grand=offTotal+titheTotal;
-    if (!ofs.length) return '';
     return`<tr><td><strong>${c.name}</strong></td><td>${c.diocese||'—'}</td><td>${ofs.length}</td>
       <td><strong>KES ${fmt(offTotal)}</strong></td><td><strong>KES ${fmt(titheTotal)}</strong></td>
       <td style="font-weight:700;color:var(--forest)">KES ${fmt(grand)}</td></tr>`;
-  }).filter(Boolean).join('') || '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--slate-light)">No offertory records yet</td></tr>') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--slate-light)">No churches yet</td></tr>';
+  }).filter(Boolean).join('');
+  tbody.innerHTML = rows || '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--slate-light)">No offertory records yet</td></tr>';
 }
 
 function exportPaymentsCSV() {
@@ -1338,10 +1173,12 @@ function exportOffertoryCSV() {
   downloadCSV('KMC_Offertory.csv',headers,rows);
 }
 
-// ── USERS ─────────────────────────────────────────────────────
+// ── USERS ──────────────────────────────────────────────────────
 async function renderUsers() {
   const users = await DB.getAdminUsers().catch(()=>[]);
-  document.getElementById('users-tbody').innerHTML = users.length ? users.map(u=>`
+  const tbody = document.getElementById('users-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = users.length ? users.map(u=>`
     <tr>
       <td><strong>${u.full_name}</strong></td>
       <td>${u.email}</td>
@@ -1351,7 +1188,7 @@ async function renderUsers() {
       <td><span class="badge ${u.is_active?'badge-active':'badge-inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td>${u.last_login?u.last_login.split('T')[0]:'Never'}</td>
       <td><button class="btn btn-outline btn-sm" onclick="openUserModal('${u.id}')">✏️ Edit</button></td>
-    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--slate-light)">No admin users configured yet</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--slate-light)">No admin users yet</td></tr>';
 }
 
 function openUserModal(editId = null) {
@@ -1359,9 +1196,11 @@ function openUserModal(editId = null) {
   document.getElementById('user-modal-title').textContent = editId?'Edit Admin User':'Add Admin User';
   document.getElementById('u-diocese').innerHTML = '<option value="">All (national)</option>'+allDioceses.map(d=>`<option>${d.name}</option>`).join('');
   document.getElementById('u-church').innerHTML = '<option value="">All in diocese</option>'+allChurches.map(c=>`<option>${c.name}</option>`).join('');
+  const pwdGroup = document.getElementById('u-password-group');
+  const helpText = document.getElementById('u-help-text');
   if (editId) {
-    document.getElementById('u-password-group').style.display = 'none';
-    document.getElementById('u-help-text').style.display = 'none';
+    if(pwdGroup) pwdGroup.style.display='none';
+    if(helpText) helpText.style.display='none';
     DB.getAdminUsers().then(users=>{
       const u=users.find(x=>x.id===editId);
       if(u){
@@ -1375,10 +1214,11 @@ function openUserModal(editId = null) {
       }
     });
   } else {
-    document.getElementById('u-password-group').style.display = 'flex';
-    document.getElementById('u-help-text').style.display = 'block';
+    if(pwdGroup) pwdGroup.style.display='flex';
+    if(helpText) helpText.style.display='block';
     document.getElementById('u-name').value=''; document.getElementById('u-email').value='';
-    document.getElementById('u-password').value=generateTempPassword();
+    const pwdEl = document.getElementById('u-password');
+    if(pwdEl) pwdEl.value=generateTempPassword();
     document.getElementById('u-role').value='viewer'; document.getElementById('u-active').value='true';
   }
   toggleUserScope();
@@ -1387,8 +1227,10 @@ function openUserModal(editId = null) {
 
 function toggleUserScope() {
   const role = document.getElementById('u-role').value;
-  document.getElementById('u-diocese-group').style.display = ['diocese_admin','church_admin'].includes(role)?'block':'none';
-  document.getElementById('u-church-group').style.display = role==='church_admin'?'block':'none';
+  const dg = document.getElementById('u-diocese-group');
+  const cg = document.getElementById('u-church-group');
+  if(dg) dg.style.display = ['diocese_admin','church_admin'].includes(role)?'block':'none';
+  if(cg) cg.style.display = role==='church_admin'?'block':'none';
 }
 
 async function saveUser() {
@@ -1403,71 +1245,41 @@ async function saveUser() {
     diocese:document.getElementById('u-diocese').value||null,
     church:document.getElementById('u-church').value||null
   };
-
-  const btn = event.target;
-  const origText = btn.textContent;
-
   if (editId) {
     row.id=editId;
-    try{
-      await DB.saveAdminUser(row);
-      toast('User updated!','success');
-      closeModal('modal-user');
-      renderUsers();
-    }catch(e){toast('Error: '+e.message,'error');}
+    try{ await DB.saveAdminUser(row); toast('User updated!','success'); closeModal('modal-user'); renderUsers(); }
+    catch(e){ toast('Error: '+e.message,'error'); }
     return;
   }
-
-  // NEW USER — create auth account + admin profile
-  const password = document.getElementById('u-password').value.trim();
-  if (!password || password.length < 6) {
-    toast('Password must be at least 6 characters.', 'error');
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = '⏳ Creating account…';
-
-  // Save current admin's session so we can restore it after signUp
+  const pwdEl = document.getElementById('u-password');
+  const password = pwdEl ? pwdEl.value.trim() : '';
+  if (!password || password.length < 6) { toast('Password must be at least 6 characters.', 'error'); return; }
+  const btn = document.querySelector('#modal-user .btn-primary');
+  const origText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Creating…'; }
   const currentSession = await Auth.getSession();
-
   try {
-    // 1. Create the Supabase Auth account (this may switch the active session)
-    const { data: signUpData, error: signUpError } = await _sb.auth.signUp({
-      email, password,
-      options: { data: { full_name: name } }
-    });
+    const { data: signUpData, error: signUpError } = await _sb.auth.signUp({ email, password, options: { data: { full_name: name } } });
     if (signUpError) throw signUpError;
-    if (!signUpData.user) throw new Error('Account creation did not return a user. The email may already be registered.');
-
-    // 2. Create the admin profile linked to that auth account
+    if (!signUpData.user) throw new Error('Account creation failed. Email may already be registered.');
     row.auth_id = signUpData.user.id;
     await DB.saveAdminUser(row);
-
-    // 3. Restore the original admin's session
     if (currentSession) {
-      await _sb.auth.setSession({
-        access_token: currentSession.access_token,
-        refresh_token: currentSession.refresh_token
-      });
+      await _sb.auth.setSession({ access_token: currentSession.access_token, refresh_token: currentSession.refresh_token });
     }
-
     closeModal('modal-user');
     renderUsers();
     showCredentialsBox(name, email, password, row.role);
   } catch(e) {
     toast('Error: '+(e.message||'Could not create user'), 'error');
   } finally {
-    btn.disabled = false;
-    btn.textContent = origText;
+    if(btn){ btn.disabled=false; btn.textContent=origText; }
   }
 }
 
 function generateTempPassword() {
   const words = ['Kmc','Faith','Grace','Hope','Mercy','Bless','Glory','Joy'];
-  const word = words[Math.floor(Math.random()*words.length)];
-  const num = Math.floor(1000+Math.random()*9000);
-  return `${word}@${num}!`;
+  return `${words[Math.floor(Math.random()*words.length)]}@${Math.floor(1000+Math.random()*9000)}!`;
 }
 
 function showCredentialsBox(name, email, password, role) {
@@ -1484,13 +1296,13 @@ function showCredentialsBox(name, email, password, role) {
         <div style="margin-bottom:10px"><div style="font-size:11px;color:var(--slate-light);text-transform:uppercase;letter-spacing:0.5px">Email</div><div style="font-family:'DM Mono',monospace;font-size:13px;color:var(--forest)">${email}</div></div>
         <div><div style="font-size:11px;color:var(--slate-light);text-transform:uppercase;letter-spacing:0.5px">Temporary Password</div><div style="font-family:'DM Mono',monospace;font-size:15px;font-weight:700;color:var(--forest)">${password}</div></div>
       </div>
-      <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="navigator.clipboard.writeText('Login: ${loginUrl}\\nEmail: ${email}\\nPassword: ${password}').then(()=>toast('Copied to clipboard!','success'))">📋 Copy All Details</button>
+      <button class="btn btn-primary" style="width:100%;margin-bottom:8px" onclick="navigator.clipboard.writeText('Login: ${loginUrl}\\nEmail: ${email}\\nPassword: ${password}').then(()=>toast('Copied!','success'))">📋 Copy All Details</button>
       <button class="btn btn-outline" style="width:100%" onclick="this.closest('.modal-overlay').remove()">Close</button>
     </div>`;
   document.body.appendChild(box);
 }
 
-// ── HELPERS ───────────────────────────────────────────────────
+// ── HELPERS ────────────────────────────────────────────────────
 function populateDioceseSelects() {
   ['f-diocese','members-filter-diocese'].forEach(id=>{
     const el=document.getElementById(id);
@@ -1500,7 +1312,6 @@ function populateDioceseSelects() {
     el.innerHTML=prefix+allDioceses.map(d=>`<option>${d.name}</option>`).join('');
     el.value=cur;
   });
-  // Offertory church filters
   ['off-filter-church','tithe-filter-church'].forEach(id=>{
     const el=document.getElementById(id);
     if(!el) return;
@@ -1520,18 +1331,18 @@ function populateChurchSelects() {
 function filterChurchSelect(dioceseSelectId, churchSelectId) {
   const diocese = document.getElementById(dioceseSelectId).value;
   const cSel = document.getElementById(churchSelectId);
+  if (!cSel) return;
   const filtered = allChurches.filter(c => !diocese || c.diocese === diocese);
   cSel.innerHTML = '<option value="">Select Church</option>' + filtered.map(c=>`<option>${c.name}</option>`).join('');
 }
 
-function openModal(id) { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { const el=document.getElementById(id); if(el) el.classList.add('open'); }
+function closeModal(id) { const el=document.getElementById(id); if(el) el.classList.remove('open'); }
 function setEl(id, val) { const el=document.getElementById(id); if(el) el.textContent=val; }
 
-// Close modal on overlay click
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => { if(e.target===overlay) overlay.classList.remove('open'); });
 });
 
-// ── START ─────────────────────────────────────────────────────
+// ── START ──────────────────────────────────────────────────────
 init();
