@@ -1,15 +1,9 @@
 // ============================================================
 // kmc-config.js  —  Supabase connection + shared utilities
-// Include this BEFORE any page script
 // ============================================================
 
-// ── CONFIGURE YOUR SUPABASE PROJECT HERE ──────────────────────
 const SUPABASE_URL  = 'https://hgpfmdgxupdesakalfyr.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhncGZtZGd4dXBkZXNha2FsZnlyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5MjcwOTMsImV4cCI6MjA5NjUwMzA5M30.kXdwfQUY8IGh9TBEhO-o8NO3-3LGLIpKSYgWy4O-Nlc';
-// ──────────────────────────────────────────────────────────────
-
-// Load Supabase JS from CDN (v2)
-// Already included via <script> tag in each HTML page
 
 const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -33,7 +27,6 @@ const Auth = {
     const { data } = await _sb.from('admin_users').select('*').eq('auth_id', userId).single();
     return data;
   },
-  // Guard: redirect to login if not authenticated
   async requireAuth(redirectTo = 'login.html') {
     const user = await Auth.getUser();
     if (!user) { window.location.href = redirectTo; return null; }
@@ -51,7 +44,7 @@ const Auth = {
 const DB = {
   // DIOCESES
   async getDioceses() {
-    const { data, error } = await _sb.from('dioceses').select('*').order('name');
+    const { data, error } = await _sb.from('dioceses').select('*').order('sort_order', {ascending: true});
     if (error) throw error;
     return data || [];
   },
@@ -74,7 +67,7 @@ const DB = {
 
   // CHURCHES
   async getChurches(dioceseName = null) {
-    let q = _sb.from('churches').select('*').order('name');
+    let q = _sb.from('churches').select('*').order('sort_order', {ascending: true});
     if (dioceseName) q = q.eq('diocese', dioceseName);
     const { data, error } = await q;
     if (error) throw error;
@@ -146,11 +139,47 @@ const DB = {
   async savePayment(row) {
     const { data, error } = await _sb.from('payments').insert(row).select().single();
     if (error) throw error;
-    // Update member paid_amount
     const member = await DB.getMember(row.member_id);
     const newPaid = (member.paid_amount || 0) + row.amount;
     await _sb.from('members').update({ paid_amount: newPaid }).eq('id', row.member_id);
     return data;
+  },
+
+  // PENDING M-PESA PAYMENTS
+  async submitPendingPayment(row) {
+    const { data, error } = await _sb.from('pending_payments').insert(row).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async getPendingPayments(status = null) {
+    let q = _sb.from('pending_payments').select('*').order('created_at', { ascending: false });
+    if (status) q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) throw error;
+    return data || [];
+  },
+  async approvePendingPayment(pending, reviewerName) {
+    const now = new Date();
+    await DB.savePayment({
+      member_id: pending.member_id,
+      member_name: pending.member_name,
+      amount: pending.amount,
+      method: 'M-Pesa',
+      reference: pending.mpesa_code,
+      payment_date: pending.payment_date,
+      financial_year: String(now.getFullYear()),
+      recorded_by: reviewerName
+    });
+    const { error } = await _sb.from('pending_payments')
+      .update({ status: 'Approved', reviewed_by: reviewerName, reviewed_at: now.toISOString() })
+      .eq('id', pending.id);
+    if (error) throw error;
+  },
+  async rejectPendingPayment(id, reviewerName, reason) {
+    const { error } = await _sb.from('pending_payments')
+      .update({ status: 'Rejected', reviewed_by: reviewerName, reviewed_at: new Date().toISOString(), rejection_reason: reason||'' })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   // OFFERTORY
